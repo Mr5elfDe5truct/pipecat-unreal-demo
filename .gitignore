@@ -1,0 +1,19 @@
+# Unreal Engine build output and caches.
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+
+# Copied from the engine by setup.sh.
+Content/
+
+# Built by Plugins/Pipecat/ThirdParty/build-linux.sh.
+Plugins/Pipecat/ThirdParty/build/
+Plugins/Pipecat/ThirdParty/Linux/
+
+# Editor project files.
+*.code-workspace
+.vscode/
+.idea/

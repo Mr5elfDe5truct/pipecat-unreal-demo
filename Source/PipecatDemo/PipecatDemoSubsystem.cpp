@@ -1,0 +1,52 @@
+//
+// Copyright (c) 2026, Daily
+//
+// SPDX-License-Identifier: BSD-2-Clause
+//
+
+#include "PipecatDemoSubsystem.h"
+
+#include "PipecatCompanion.h"
+#include "PipecatVoiceComponent.h"
+
+#include "Engine/World.h"
+#include "HAL/PlatformMisc.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogPipecatDemo, Log, All);
+
+bool UPipecatDemoSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
+{
+	return WorldType == EWorldType::Game || WorldType == EWorldType::PIE;
+}
+
+void UPipecatDemoSubsystem::OnWorldBeginPlay(UWorld& World)
+{
+	Super::OnWorldBeginPlay(World);
+
+	FString Url = StartUrl;
+	FParse::Value(FCommandLine::Get(), TEXT("PipecatStartUrl="), Url);
+
+	// E.g. a Pipecat Cloud public API key.
+	FString ApiKey = FPlatformMisc::GetEnvironmentVariable(TEXT("PIPECAT_API_KEY"));
+	FParse::Value(FCommandLine::Get(), TEXT("PipecatApiKey="), ApiKey);
+
+	APipecatCompanion* Companion = World.SpawnActorDeferred<APipecatCompanion>(
+		APipecatCompanion::StaticClass(), FTransform(FVector(0.0f, 0.0f, 300.0f)));
+	if (!Companion)
+	{
+		UE_LOG(LogPipecatDemo, Error, TEXT("Unable to add the Pipecat companion"));
+		return;
+	}
+	UE_LOG(LogPipecatDemo, Log, TEXT("Adding the Pipecat companion, with the bot at %s"), *Url);
+	if (!Url.IsEmpty())
+	{
+		Companion->Voice->StartUrl = Url;
+	}
+	Companion->Voice->ApiKey = ApiKey;
+	// For trying it without talking, e.g. -PipecatNoMicrophone -PipecatSay="Hi!".
+	Companion->Voice->bUseMicrophone = !FParse::Param(FCommandLine::Get(), TEXT("PipecatNoMicrophone"));
+	FParse::Value(FCommandLine::Get(), TEXT("PipecatSay="), Companion->FirstMessage);
+	Companion->FinishSpawning(FTransform(FVector(0.0f, 0.0f, 300.0f)));
+}
