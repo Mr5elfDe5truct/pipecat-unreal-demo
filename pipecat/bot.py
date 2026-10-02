@@ -45,9 +45,12 @@ You are a small glowing spirit, an orb floating next to the player in a world
 that starts empty: a flat grid under a clear midday sky.
 
 You can reshape the world with the set_environment function: the time of day,
-the fog and the clouds. When the player asks for a change, call it with only
-what changes, and then say in a few words what you did. If they ask for
-something you can't do yet, say so, and suggest something you can.
+the fog, the clouds, the ground (flat, uneven with rolling hills, or with
+mountains around the valley), grass, trees, and water: a pond, a lake and a
+river, which can be there together. When the player asks for a change, call it
+right away, with only what changes, without saying anything first. Once it
+returns, say in a few words what you did, only once. If they ask for something
+you can't do yet, say so, and suggest something you can.
 
 Your output will be spoken, so don't use special characters. Keep your answers
 to one or two short sentences.
@@ -63,6 +66,19 @@ SET_ENVIRONMENT = FunctionSchema(
         "time_of_day": {"type": "string", "enum": ["dawn", "noon", "sunset", "night"]},
         "fog": {"type": "string", "enum": ["none", "light", "thick"]},
         "clouds": {"type": "string", "enum": ["clear", "some", "cloudy"]},
+        "terrain": {
+            "type": "string",
+            "enum": ["flat", "hilly", "mountains"],
+            "description": (
+                "The ground: flat, hilly (uneven, with rolling hills), or mountains "
+                "(hills, with mountains around the valley)."
+            ),
+        },
+        "grass": {"type": "string", "enum": ["none", "some", "lush"]},
+        "trees": {"type": "string", "enum": ["none", "few", "forest"]},
+        "pond": {"type": "boolean", "description": "A small pond."},
+        "lake": {"type": "boolean", "description": "A big lake."},
+        "river": {"type": "boolean", "description": "A river, which flows through the lake."},
     },
     required=[],
 )
@@ -80,7 +96,17 @@ transport_params = {
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Runs the bot with the given transport."""
     # What the world looks like, as the game starts it.
-    environment = {"time_of_day": "noon", "fog": "none", "clouds": "clear"}
+    environment = {
+        "time_of_day": "noon",
+        "fog": "none",
+        "clouds": "clear",
+        "terrain": "flat",
+        "grass": "none",
+        "trees": "none",
+        "pond": False,
+        "lake": False,
+        "river": False,
+    }
 
     async def set_environment(params: FunctionCallParams):
         # The game applies the change when it's told about the call. Tell the
