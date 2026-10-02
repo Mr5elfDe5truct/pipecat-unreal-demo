@@ -18,10 +18,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPipecatEvent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPipecatTextEvent, const FString&, Text);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPipecatTranscriptEvent, const FString&, Text, bool, bFinal);
 
-// Handles a function call from the bot's LLM, on the game thread. The
-// arguments and the result are JSON. Call Respond once, now or later.
-using FPipecatFunctionHandler =
-	TFunction<void(const FString& ArgumentsJson, TFunction<void(const FString& ResultJson)> Respond)>;
+// Reacts to the bot's LLM calling a function, on the game thread, with the
+// call's arguments as JSON. The bot runs the function and gives the LLM its
+// result.
+using FPipecatFunctionHandler = TFunction<void(const FString& ArgumentsJson)>;
 
 /**
  * Talks to a Pipecat bot with voice: starts the bot, sends it the microphone,
@@ -81,7 +81,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Pipecat")
 	float GetMicrophoneLevel() const;
 
-	/** Handles a function the bot's LLM can call. Register it before connecting. */
+	/** Reacts to calls to one of the bot's functions. Register it before connecting. */
 	void RegisterFunction(const FString& Name, FPipecatFunctionHandler Handler);
 
 	/** The bot is ready to talk. */

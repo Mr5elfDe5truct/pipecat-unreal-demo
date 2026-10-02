@@ -57,12 +57,11 @@ void UPipecatDemoSubsystem::OnWorldBeginPlay(UWorld& World)
 	FParse::Value(FCommandLine::Get(), TEXT("PipecatSay="), Companion->FirstMessage);
 
 	// The bot changes the world with set_environment, e.g. with
-	// {"time_of_day": "sunset"}. It keeps track of the world itself, so the game
-	// doesn't answer.
+	// {"time_of_day": "sunset"}. It keeps track of the world itself.
 	TWeakObjectPtr<APipecatWorld> WeakEnvironment = Environment;
 	Companion->Voice->RegisterFunction(
 		TEXT("set_environment"),
-		[WeakEnvironment](const FString& ArgumentsJson, TFunction<void(const FString&)>) {
+		[WeakEnvironment](const FString& ArgumentsJson) {
 			TSharedPtr<FJsonObject> Changes;
 			if (WeakEnvironment.IsValid() &&
 				FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(ArgumentsJson), Changes) && Changes)

@@ -254,34 +254,18 @@ public:
 
 	virtual void on_llm_function_call_in_progress(
 		const pipecat::rtvi::LLMFunctionCallInProgressData& Data,
-		pipecat::FunctionCallResultCallback Respond) override
+		pipecat::FunctionCallResultCallback /* Respond */) override
 	{
+		// The bot runs its functions and gives its LLM the results, so the
+		// game only reacts to them, and never responds.
 		auto Function = Data.function_name ? Functions.find(*Data.function_name) : Functions.end();
 		if (Function == Functions.end())
 		{
-			// E.g. a function the bot runs itself.
 			return;
 		}
-
-		// Game functions run on the game thread.
-		TWeakObjectPtr<UPipecatVoiceComponent> WeakOwner = Owner;
 		FPipecatFunctionHandler Handler = Function->second;
 		FString Arguments = ToFString(Data.arguments.dump());
-		AsyncTask(ENamedThreads::GameThread, [WeakOwner, Handler, Arguments, Respond]() {
-			if (!WeakOwner.IsValid())
-			{
-				Respond({{"error", "The game isn't running"}});
-				return;
-			}
-			Handler(Arguments, [Respond](const FString& ResultJson) {
-				nlohmann::json Result = nlohmann::json::parse(ToStdString(ResultJson), nullptr, false);
-				if (Result.is_discarded())
-				{
-					Result = ToStdString(ResultJson);
-				}
-				Respond(Result);
-			});
-		});
+		Post([Handler, Arguments](UPipecatVoiceComponent&) { Handler(Arguments); });
 	}
 
 private:
