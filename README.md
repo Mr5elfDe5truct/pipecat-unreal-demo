@@ -118,6 +118,17 @@ Then, from this directory:
    .\setup.ps1
    ```
 
+In cmd.exe, set the variables with `set`, and run the `.bat` next to each
+script instead, which runs it with PowerShell:
+
+```
+set UE_ROOT=C:\Program Files\Epic Games\UE_5.8
+set PIPECAT_CLIENT_CXX=C:\path\to\pipecat-client-cxx
+Plugins\Pipecat\ThirdParty\build-windows.bat
+"%UE_ROOT%\Engine\Build\BatchFiles\Build.bat" PipecatDemoEditor Win64 Development -Project="%CD%\PipecatDemo.uproject"
+setup.bat
+```
+
 ## 🚀 Run
 
 1. Start the bot, with your API keys in `pipecat/.env`:
