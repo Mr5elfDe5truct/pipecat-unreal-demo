@@ -35,6 +35,11 @@ namespace
 const uint32 UserSampleRate = 16000;
 const uint32 BotSampleRate = 48000;
 
+// The most bot voice Unreal can have waiting to be played. Unreal doesn't play
+// sounds while the game is paused, or in the background in the editor, and
+// anything beyond this is dropped, so the voice is never further behind.
+const int32 MaxQueuedBotVoiceBytes = BotSampleRate * 3 / 10 * sizeof(int16);
+
 FString ToFString(const std::string& Text)
 {
 	return FString(UTF8_TO_TCHAR(Text.c_str()));
@@ -224,13 +229,23 @@ public:
 
 	virtual void on_bot_output(const pipecat::rtvi::BotOutputData& Data) override
 	{
-		// Text the bot speaks is sent again as it speaks it, so only pass on
-		// the first update of each segment.
+		// Text the bot speaks comes first when it's written, and then again as
+		// it's spoken. Pass it on once, when the bot starts speaking it, so it
+		// matches the voice.
+		if (Data.will_be_spoken.value_or(false) && Data.spoken_status == std::optional<std::string>("new"))
+		{
+			return;
+		}
 		if (Data.segment_id && !OutputSegments.insert(*Data.segment_id).second)
 		{
 			return;
 		}
-		FString Text = ToFString(Data.text);
+		FString Text = ToFString(Data.text).TrimStartAndEnd();
+		if (Text.IsEmpty())
+		{
+			// E.g. a paragraph break.
+			return;
+		}
 		Post([Text](UPipecatVoiceComponent& C) { C.OnBotOutput.Broadcast(Text); });
 	}
 
@@ -292,7 +307,11 @@ private:
 				continue;
 			}
 			BotLevel = Loudness(Frames.data(), Read);
-			Wave->QueueAudio(reinterpret_cast<const uint8*>(Frames.data()), Read * sizeof(int16));
+			if (Wave->GetAvailableAudioByteCount() < MaxQueuedBotVoiceBytes)
+			{
+				Wave->QueueAudio(reinterpret_cast<const uint8*>(Frames.data()), Read * sizeof(int16));
+			}
+
 		}
 	}
 
@@ -314,7 +333,7 @@ private:
 
 UPipecatVoiceComponent::UPipecatVoiceComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
 }
 
 void UPipecatVoiceComponent::BeginPlay()
@@ -328,6 +347,9 @@ void UPipecatVoiceComponent::BeginPlay()
 	VoiceWave->Duration = INDEFINITELY_LOOPING_DURATION;
 	VoiceWave->SoundGroup = SOUNDGROUP_Voice;
 	VoiceWave->bLooping = false;
+	// Unreal stops sounds it virtualizes, e.g. when they can't be heard, and
+	// a stream can't be restarted.
+	VoiceWave->VirtualizationMode = EVirtualizationMode::PlayWhenSilent;
 
 	AActor* Owner = GetOwner();
 	VoiceAudio = NewObject<UAudioComponent>(Owner, TEXT("PipecatVoice"));
@@ -361,6 +383,23 @@ void UPipecatVoiceComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		VoiceAudio->Stop();
 	}
 	Super::EndPlay(EndPlayReason);
+}
+
+void UPipecatVoiceComponent::TickComponent(
+	float DeltaTime,
+	ELevelTick TickType,
+	FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	// If something stops the bot's voice, play it again, without what was
+	// waiting to be played.
+	if (VoiceAudio && IsReady() && !VoiceAudio->IsPlaying())
+	{
+		UE_LOG(LogPipecat, Warning, TEXT("The bot's voice stopped playing, playing it again"));
+		VoiceWave->ResetAudio();
+		VoiceAudio->Play();
+	}
 }
 
 void UPipecatVoiceComponent::Connect()

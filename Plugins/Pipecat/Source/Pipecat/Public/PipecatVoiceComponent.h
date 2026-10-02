@@ -116,9 +116,14 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Pipecat")
 	FPipecatEvent OnBotInterrupted;
 
-	/** Text the bot is about to say, a sentence at a time. */
+	/** Text the bot says, a sentence at a time, as it starts saying it. */
 	UPROPERTY(BlueprintAssignable, Category = "Pipecat")
 	FPipecatTextEvent OnBotOutput;
+
+	virtual void TickComponent(
+		float DeltaTime,
+		ELevelTick TickType,
+		FActorComponentTickFunction* ThisTickFunction) override;
 
 protected:
 	virtual void BeginPlay() override;
