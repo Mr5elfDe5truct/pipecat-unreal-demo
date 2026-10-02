@@ -5,5 +5,8 @@ description = "The bot of the Pipecat Unreal Engine demo"
 requires-python = ">=3.11"
 dependencies = [
     "python-dotenv",
-    "pipecat-ai[google,runner,silero,websocket]>=1.12.0",
+    "pipecat-ai[cartesia,deepgram,openai,runner,silero,websocket]>=1.12.0",
 ]
+
+[tool.ruff]
+line-length = 100

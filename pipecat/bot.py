@@ -4,10 +4,11 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
-"""The orb's bot: a Gemini Live voice agent that reshapes the game's world.
+"""The orb's bot: a voice agent that reshapes the game's world.
 
+It hears the player with Deepgram, answers with OpenAI and speaks with Cartesia.
 The game connects to it over a WebSocket. When the player asks for a change,
-Gemini calls ``set_environment``, which the game receives, with its arguments,
+the LLM calls ``set_environment``, which the game receives, with its arguments,
 and applies.
 
 Run it with ``uv run bot.py -t websocket``.
@@ -32,8 +33,10 @@ from pipecat.processors.frameworks.rtvi import RTVIFunctionCallReportLevel, RTVI
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
-from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
+from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.workers.runner import WorkerRunner
@@ -115,19 +118,22 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         logger.info(f"Environment: {environment}")
         await params.result_callback(environment)
 
-    llm = GeminiLiveLLMService(
-        api_key=os.getenv("GOOGLE_API_KEY"),
-        settings=GeminiLiveLLMService.Settings(
-            voice="Puck",
-            system_instruction=SYSTEM_INSTRUCTION,
+    tts = CartesiaTTSService(
+        api_key=os.environ["CARTESIA_API_KEY"],
+        settings=CartesiaTTSService.Settings(
+            voice="86e30c1d-714b-4074-a1f2-1cb6b552fb49",
         ),
-        tools=ToolsSchema(standard_tools=[SET_ENVIRONMENT]),
+    )
+
+    stt = DeepgramSTTService(api_key=os.environ["DEEPGRAM_API_KEY"])
+
+    llm = OpenAILLMService(
+        api_key=os.environ["OPENAI_API_KEY"],
+        settings=OpenAILLMService.Settings(system_instruction=SYSTEM_INSTRUCTION),
     )
     llm.register_function("set_environment", set_environment)
 
-    context = LLMContext(
-        [{"role": "user", "content": "Greet the player in one short sentence."}],
-    )
+    context = LLMContext(tools=ToolsSchema([SET_ENVIRONMENT]))
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
@@ -136,8 +142,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     pipeline = Pipeline(
         [
             transport.input(),
+            stt,
             user_aggregator,
             llm,
+            tts,
             transport.output(),
             assistant_aggregator,
         ]
@@ -154,6 +162,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
+        context.add_message(
+            {"role": "developer", "content": "Please introduce yourself to the user."}
+        )
         await worker.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
