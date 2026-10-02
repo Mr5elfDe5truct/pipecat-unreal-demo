@@ -18,7 +18,8 @@ class UPointLightComponent;
 class UStaticMeshComponent;
 
 // A glowing orb that follows the player around. It's a Pipecat bot: you talk
-// to it, and its voice comes from where it is.
+// to it, and its voice comes from where it is. The player glows too, while
+// they speak.
 UCLASS()
 class APipecatCompanion : public AActor
 {
@@ -82,6 +83,11 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> OrbMaterial;
+
+	// The player's glow, over their mesh, and how much it glows.
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> PlayerGlow;
+	float PlayerGlowLevel = 0.0f;
 
 	TSharedPtr<SPipecatSubtitles> Subtitles;
 	// What the user and the bot said in the last exchange, so far.

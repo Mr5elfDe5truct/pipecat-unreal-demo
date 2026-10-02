@@ -11,6 +11,9 @@
   Patchiness parameter, and mud where the ground's vertex color is red, e.g.
   on the shores. With Detail, the game also makes the color drier in places,
   and grainy, as grass comes.
+- M_Glow, a glow around a mesh's edges, for the player while they speak. The
+  game sets its Color, and how much it glows with Glow, which looks the same
+  however bright the scene is.
 
 setup.sh runs it in the editor, e.g.:
 
@@ -24,6 +27,7 @@ GRID = "/Game/LevelPrototyping/Materials/M_PrototypeGrid"
 GRAY_GRID = "/Game/LevelPrototyping/Materials/MI_PrototypeGrid_Gray"
 GROUND = "/Game/Pipecat/M_Ground"
 GROUND_INSTANCE = "/Game/Pipecat/MI_Ground"
+GLOW = "/Game/Pipecat/M_Glow"
 
 # How dirt, with ragged edges, covers the grid's color, and how the color
 # varies.
@@ -39,7 +43,7 @@ return lerp(Grid, Color * (0.8 + 0.4 * Grain), Detail);
 assets = unreal.get_editor_subsystem(unreal.EditorAssetSubsystem)
 editing = unreal.MaterialEditingLibrary
 
-for path in [GROUND_INSTANCE, GROUND]:
+for path in [GROUND_INSTANCE, GROUND, GLOW]:
     if assets.does_asset_exist(path):
         assets.delete_asset(path)
 
@@ -112,4 +116,38 @@ instance = assets.duplicate_asset(GRAY_GRID, GROUND_INSTANCE)
 editing.set_material_instance_parent(instance, material)
 assets.save_asset(GROUND_INSTANCE)
 
+#
+# The glow
+#
+
+path, name = GLOW.rsplit("/", 1)
+glow = unreal.AssetToolsHelpers.get_asset_tools().create_asset(name, path, unreal.Material, unreal.MaterialFactoryNew())
+glow.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+glow.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+# For characters.
+glow.set_editor_property("used_with_skeletal_mesh", True)
+
+# Faint across the mesh, and bright at its edges, undoing the camera's
+# exposure.
+color = editing.create_material_expression(glow, unreal.MaterialExpressionVectorParameter, -600, 0)
+color.set_editor_property("parameter_name", "Color")
+color.set_editor_property("default_value", unreal.LinearColor(1.0, 1.0, 1.0, 1.0))
+amount = scalar(glow, "Glow", 200)
+edges = editing.create_material_expression(glow, unreal.MaterialExpressionFresnel, -600, 300)
+edges.set_editor_property("exponent", 2.5)
+edges.set_editor_property("base_reflect_fraction", 0.15)
+tinted = editing.create_material_expression(glow, unreal.MaterialExpressionMultiply, -300, 100)
+editing.connect_material_expressions(color, "", tinted, "A")
+editing.connect_material_expressions(amount, "", tinted, "B")
+edged = editing.create_material_expression(glow, unreal.MaterialExpressionMultiply, -150, 200)
+editing.connect_material_expressions(tinted, "", edged, "A")
+editing.connect_material_expressions(edges, "", edged, "B")
+exposure = editing.create_material_expression(glow, unreal.MaterialExpressionEyeAdaptationInverse, -300, 400)
+emissive = editing.create_material_expression(glow, unreal.MaterialExpressionMultiply, 0, 300)
+editing.connect_material_expressions(edged, "", emissive, "A")
+editing.connect_material_expressions(exposure, "", emissive, "B")
+editing.connect_material_property(emissive, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+
+editing.recompile_material(glow)
+assets.save_asset(GLOW)
 unreal.log("Created the demo's materials")

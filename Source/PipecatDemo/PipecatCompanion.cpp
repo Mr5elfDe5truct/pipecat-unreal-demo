@@ -14,7 +14,7 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
-#include "GameFramework/Pawn.h"
+#include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
@@ -26,6 +26,8 @@ namespace
 const FLinearColor IdleColor(0.15f, 0.45f, 1.0f);
 const FLinearColor ListeningColor(0.15f, 1.0f, 0.45f);
 const FLinearColor SpeakingColor(0.65f, 0.3f, 1.0f);
+// The player's, while they speak.
+const FLinearColor PlayerColor(1.0f, 0.12f, 0.08f);
 } // namespace
 
 APipecatCompanion::APipecatCompanion()
@@ -57,6 +59,13 @@ void APipecatCompanion::BeginPlay()
 	{
 		OrbMaterial = UMaterialInstanceDynamic::Create(Emissive, this);
 		Orb->SetMaterial(0, OrbMaterial);
+	}
+	// Created by setup.sh.
+	UMaterialInterface* GlowMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Pipecat/M_Glow.M_Glow"));
+	if (GlowMaterial)
+	{
+		PlayerGlow = UMaterialInstanceDynamic::Create(GlowMaterial, this);
+		PlayerGlow->SetVectorParameterValue(TEXT("Color"), PlayerColor);
 	}
 
 	Voice->OnBotReady.AddDynamic(this, &APipecatCompanion::HandleBotReady);
@@ -140,6 +149,19 @@ void APipecatCompanion::UpdateGlow(float DeltaSeconds)
 	Glow->SetLightColor(Color);
 	Glow->SetIntensity(1500.0f + 25000.0f * SmoothedLevel);
 	Orb->SetWorldScale3D(FVector(0.3f * (1.0f + 0.6f * SmoothedLevel)));
+
+	// The player glows with their voice, over whatever they look like.
+	ACharacter* Player = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	if (PlayerGlow && Player)
+	{
+		float Target = bUserSpeaking ? 1.5f + 10.0f * SmoothedLevel : 0.0f;
+		PlayerGlowLevel = FMath::FInterpTo(PlayerGlowLevel, Target, DeltaSeconds, 10.0f);
+		PlayerGlow->SetScalarParameterValue(TEXT("Glow"), PlayerGlowLevel);
+		if (Player->GetMesh()->GetOverlayMaterial() != PlayerGlow)
+		{
+			Player->GetMesh()->SetOverlayMaterial(PlayerGlow);
+		}
+	}
 }
 
 void APipecatCompanion::HandleBotReady()
