@@ -1,17 +1,18 @@
 # Pipecat Unreal Engine Demo
 
-Talk to a glowing orb in Unreal Engine, and it shapes the world around you.
+This demo shows how to bring a [Pipecat](https://github.com/pipecat-ai/pipecat)
+voice agent into an Unreal Engine game. Talk to a glowing orb, and it shapes
+the world around you.
 
 You start alone on an empty, flat grid under a clear midday sky. Ask the orb
 for hills, grass, mountains, a lake, a river that flows into it, a forest,
 some fog or a sunset, and the world changes around you as it answers.
 
-The orb is a [Pipecat](https://github.com/pipecat-ai/pipecat) bot, a voice
-agent that hears you with Deepgram, answers with OpenAI and speaks with
-Cartesia. The game talks to it over a WebSocket with the
-[Pipecat C++ client](https://github.com/pipecat-ai/pipecat-client-cxx).
+The orb is a Pipecat bot, a voice agent that hears you with Deepgram, answers
+with OpenAI and speaks with Cartesia. The game talks to it over a WebSocket
+with the [Pipecat C++ client](https://github.com/pipecat-ai/pipecat-client-cxx).
 
-## Requirements
+## 📋 Requirements
 
 - Linux, on x86_64. The demo only builds on Linux for now.
 - [Unreal Engine 5.8](https://www.unrealengine.com/en-US/linux), e.g. Epic's
@@ -28,7 +29,7 @@ Cartesia. The game talks to it over a WebSocket with the
 - A microphone. Headphones work best: the game doesn't cancel the orb's echo,
   so with speakers the orb can hear itself.
 
-## Build
+## 🔨 Build
 
 Get the demo:
 
@@ -69,7 +70,7 @@ Then, from this directory:
    ./setup.sh
    ```
 
-## Run
+## 🚀 Run
 
 1. Start the bot, with your API keys in `pipecat/.env`:
 
@@ -116,7 +117,7 @@ is what the orb can change:
 | Trees       | None, a few or a forest                |
 | Water       | A pond, a lake and a river, or none    |
 
-## How it works
+## ⚙️ How it works
 
 - The game, in `Source/PipecatDemo`, puts the orb next to the player. The orb
   has a voice component from the Pipecat plugin, in `Plugins/Pipecat`, which
@@ -129,7 +130,7 @@ is what the orb can change:
 - The orb glows as it speaks, you glow as you speak, and subtitles show what
   you both say.
 
-## Options
+## 🎛️ Options
 
 The game takes these on the command line, with the editor too:
 
@@ -153,7 +154,7 @@ no grass mesh, so grass only colors the ground. For a more realistic look, use
 other meshes, e.g. from [Fab](https://www.fab.com), by listing them as
 `GrassMeshes` and `TreeMeshes` in `Config/DefaultGame.ini`.
 
-## What's where
+## 🗂️ What's where
 
 - `Plugins/Pipecat`: the Pipecat plugin, with its voice component, and the
   scripts that build the Pipecat C++ client for it.
