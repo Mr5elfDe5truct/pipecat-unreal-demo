@@ -6,12 +6,13 @@ DerivedDataCache/
 Plugins/*/Binaries/
 Plugins/*/Intermediate/
 
-# Copied from the engine by setup.sh.
+# Copied from the engine by setup.sh or setup.ps1.
 Content/
 
-# Built by Plugins/Pipecat/ThirdParty/build-linux.sh.
+# Built by Plugins/Pipecat/ThirdParty/build-linux.sh or build-windows.ps1.
 Plugins/Pipecat/ThirdParty/build/
 Plugins/Pipecat/ThirdParty/Linux/
+Plugins/Pipecat/ThirdParty/Win64/
 
 # Editor project files.
 *.code-workspace

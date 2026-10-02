@@ -14,7 +14,17 @@
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
-				"Linux"
+				"Linux",
+				"Win64"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "AudioCapture",
+			"Enabled": true,
+			"PlatformAllowList": [
+				"Win64"
 			]
 		}
 	]
