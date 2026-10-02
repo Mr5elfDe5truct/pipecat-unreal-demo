@@ -1,0 +1,9 @@
+[project]
+name = "pipecat-unreal-demo-bot"
+version = "0.1.0"
+description = "The bot of the Pipecat Unreal Engine demo"
+requires-python = ">=3.11"
+dependencies = [
+    "python-dotenv",
+    "pipecat-ai[google,runner,silero,websocket]>=1.12.0",
+]

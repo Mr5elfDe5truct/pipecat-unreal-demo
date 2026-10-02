@@ -11,8 +11,8 @@
 
 #include "PipecatDemoSubsystem.generated.h"
 
-// Adds the Pipecat companion to the level when play begins, so the level
-// itself doesn't change.
+// Builds the world the bot changes, and adds the Pipecat companion to it, when
+// play begins.
 UCLASS(Config = Game)
 class UPipecatDemoSubsystem : public UWorldSubsystem
 {

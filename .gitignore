@@ -17,3 +17,9 @@ Plugins/Pipecat/ThirdParty/Linux/
 *.code-workspace
 .vscode/
 .idea/
+
+# The bot's virtual environment and secrets.
+pipecat/.venv/
+pipecat/.env
+pipecat/.envrc
+pipecat/__pycache__/

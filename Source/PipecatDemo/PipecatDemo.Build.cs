@@ -18,6 +18,7 @@ public class PipecatDemo : ModuleRules
 			"Engine",
 			"Json",
 			"Pipecat",
+			"ProceduralMeshComponent",
 			"Slate",
 			"SlateCore",
 		});

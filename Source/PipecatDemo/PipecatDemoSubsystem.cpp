@@ -8,11 +8,15 @@
 
 #include "PipecatCompanion.h"
 #include "PipecatVoiceComponent.h"
+#include "PipecatWorld.h"
 
+#include "Dom/JsonObject.h"
 #include "Engine/World.h"
 #include "HAL/PlatformMisc.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogPipecatDemo, Log, All);
 
@@ -32,6 +36,9 @@ void UPipecatDemoSubsystem::OnWorldBeginPlay(UWorld& World)
 	FString ApiKey = FPlatformMisc::GetEnvironmentVariable(TEXT("PIPECAT_API_KEY"));
 	FParse::Value(FCommandLine::Get(), TEXT("PipecatApiKey="), ApiKey);
 
+	// The world the bot changes, which starts as an empty grid.
+	APipecatWorld* Environment = World.SpawnActor<APipecatWorld>();
+
 	APipecatCompanion* Companion = World.SpawnActorDeferred<APipecatCompanion>(
 		APipecatCompanion::StaticClass(), FTransform(FVector(0.0f, 0.0f, 300.0f)));
 	if (!Companion)
@@ -48,5 +55,21 @@ void UPipecatDemoSubsystem::OnWorldBeginPlay(UWorld& World)
 	// For trying it without talking, e.g. -PipecatNoMicrophone -PipecatSay="Hi!".
 	Companion->Voice->bUseMicrophone = !FParse::Param(FCommandLine::Get(), TEXT("PipecatNoMicrophone"));
 	FParse::Value(FCommandLine::Get(), TEXT("PipecatSay="), Companion->FirstMessage);
+
+	// The bot changes the world with set_environment, e.g. with
+	// {"time_of_day": "sunset"}. It keeps track of the world itself, so the game
+	// doesn't answer.
+	TWeakObjectPtr<APipecatWorld> WeakEnvironment = Environment;
+	Companion->Voice->RegisterFunction(
+		TEXT("set_environment"),
+		[WeakEnvironment](const FString& ArgumentsJson, TFunction<void(const FString&)>) {
+			TSharedPtr<FJsonObject> Changes;
+			if (WeakEnvironment.IsValid() &&
+				FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(ArgumentsJson), Changes) && Changes)
+			{
+				WeakEnvironment->SetEnvironment(*Changes);
+			}
+		});
+
 	Companion->FinishSpawning(FTransform(FVector(0.0f, 0.0f, 300.0f)));
 }
