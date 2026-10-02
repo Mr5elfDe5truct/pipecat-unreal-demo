@@ -11,8 +11,8 @@
 
 class STextBlock;
 
-// Subtitles at the bottom of the screen: what the user and the bot say, and
-// what's going on.
+// Subtitles at the bottom of the screen: what the user and the bot (the orb)
+// say, and the connection's status.
 class SPipecatSubtitles : public SCompoundWidget
 {
 public:

@@ -176,10 +176,17 @@ void APipecatCompanion::HandleError(const FString& Error)
 void APipecatCompanion::HandleUserStartedSpeaking()
 {
 	bUserSpeaking = true;
-	BotText.Empty();
+	// A new exchange, once the bot answered the last one. Until then, the
+	// user is still taking their turn.
+	if (!BotText.IsEmpty())
+	{
+		UserText.Empty();
+		BotText.Empty();
+	}
 	if (Subtitles)
 	{
-		Subtitles->SetStatus(TEXT("Listening..."));
+		Subtitles->SetStatus(TEXT(""));
+		Subtitles->SetUserText(UserText);
 		Subtitles->SetBotText(BotText);
 	}
 }
@@ -187,21 +194,29 @@ void APipecatCompanion::HandleUserStartedSpeaking()
 void APipecatCompanion::HandleUserStoppedSpeaking()
 {
 	bUserSpeaking = false;
-	if (Subtitles)
-	{
-		Subtitles->SetStatus(TEXT("Thinking..."));
-	}
 }
 
 void APipecatCompanion::HandleUserTranscript(const FString& Text, bool bFinal)
 {
+	FString Piece = Text.TrimStartAndEnd();
+	if (Piece.IsEmpty())
+	{
+		return;
+	}
 	if (bFinal)
 	{
-		UE_LOG(LogPipecatCompanion, Log, TEXT("User: %s"), *Text);
+		UE_LOG(LogPipecatCompanion, Log, TEXT("User: %s"), *Piece);
+	}
+	// The user's turn comes in pieces: the finished ones, and the one they're
+	// saying now.
+	FString Turn = UserText.IsEmpty() ? Piece : UserText + TEXT(" ") + Piece;
+	if (bFinal)
+	{
+		UserText = Turn;
 	}
 	if (Subtitles)
 	{
-		Subtitles->SetUserText(Text);
+		Subtitles->SetUserText(Turn);
 	}
 }
 
@@ -209,10 +224,6 @@ void APipecatCompanion::HandleBotStartedSpeaking()
 {
 	UE_LOG(LogPipecatCompanion, Log, TEXT("Bot started speaking"));
 	bBotSpeaking = true;
-	if (Subtitles)
-	{
-		Subtitles->SetStatus(TEXT(""));
-	}
 }
 
 void APipecatCompanion::HandleBotStoppedSpeaking()
@@ -227,7 +238,6 @@ void APipecatCompanion::HandleBotInterrupted()
 	BotText.Empty();
 	if (Subtitles)
 	{
-		Subtitles->SetStatus(TEXT("Oh, sorry, go ahead."));
 		Subtitles->SetBotText(BotText);
 	}
 }

@@ -84,6 +84,8 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> OrbMaterial;
 
 	TSharedPtr<SPipecatSubtitles> Subtitles;
+	// What the user and the bot said in the last exchange, so far.
+	FString UserText;
 	FString BotText;
 	bool bUserSpeaking = false;
 	bool bBotSpeaking = false;

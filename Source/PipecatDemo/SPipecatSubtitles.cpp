@@ -13,19 +13,20 @@
 
 void SPipecatSubtitles::Construct(const FArguments& InArgs)
 {
+	// Lines are as wide as their text, up to most of the screen.
 	auto Line = [](TSharedPtr<STextBlock>& Text, int32 Size, const FLinearColor& Color) {
 		return SAssignNew(Text, STextBlock)
 			.Font(FCoreStyle::GetDefaultFontStyle("Regular", Size))
 			.ColorAndOpacity(Color)
 			.ShadowOffset(FVector2D(1.0f, 1.0f))
 			.Justification(ETextJustify::Center)
-			.AutoWrapText(true);
+			.WrapTextAt(1200.0f);
 	};
 
 	ChildSlot
 	.HAlign(HAlign_Center)
 	.VAlign(VAlign_Bottom)
-	.Padding(FMargin(120.0f, 0.0f, 120.0f, 60.0f))
+	.Padding(FMargin(40.0f, 0.0f, 40.0f, 60.0f))
 	[
 		SNew(SBorder)
 		.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
@@ -56,10 +57,10 @@ void SPipecatSubtitles::SetStatus(const FString& Text)
 
 void SPipecatSubtitles::SetUserText(const FString& Text)
 {
-	User->SetText(Text.IsEmpty() ? FText::GetEmpty() : FText::FromString(FString::Printf(TEXT("You: %s"), *Text)));
+	User->SetText(Text.IsEmpty() ? FText::GetEmpty() : FText::FromString(FString::Printf(TEXT("User: %s"), *Text)));
 }
 
 void SPipecatSubtitles::SetBotText(const FString& Text)
 {
-	Bot->SetText(FText::FromString(Text));
+	Bot->SetText(Text.IsEmpty() ? FText::GetEmpty() : FText::FromString(FString::Printf(TEXT("Orb: %s"), *Text)));
 }
