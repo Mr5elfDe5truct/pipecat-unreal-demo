@@ -22,14 +22,14 @@ public class Pipecat : ModuleRules
 			"Engine",
 		});
 
-		bool bWindows = Target.Platform == UnrealTargetPlatform.Win64;
-
 		// The Pipecat C++ client and its WebSocket transport, with the libraries
-		// they need, built with Unreal's toolchain by ThirdParty/build-linux.sh,
-		// or with Visual Studio's by ThirdParty/build-windows.ps1.
-		string ThirdParty = Path.Combine(PluginDirectory, "ThirdParty", bWindows ? "Win64" : "Linux");
+		// they need, built in ThirdParty/<platform>, e.g. ThirdParty/Linux, by
+		// ThirdParty/build-linux.sh with Unreal's toolchain, or by
+		// ThirdParty/build-windows.ps1 with Visual Studio's.
+		string ThirdParty = Path.Combine(PluginDirectory, "ThirdParty", Target.Platform.ToString());
 		PublicSystemIncludePaths.Add(Path.Combine(ThirdParty, "include"));
-		foreach (string Library in Directory.GetFiles(Path.Combine(ThirdParty, "lib"), bWindows ? "*.lib" : "*.a"))
+		string Libraries = Target.Platform == UnrealTargetPlatform.Win64 ? "*.lib" : "*.a";
+		foreach (string Library in Directory.GetFiles(Path.Combine(ThirdParty, "lib"), Libraries))
 		{
 			PublicAdditionalLibraries.Add(Library);
 		}
@@ -38,24 +38,27 @@ public class Pipecat : ModuleRules
 		// the WebSocket.
 		AddEngineThirdPartyPrivateStaticDependencies(Target, "libcurl", "nghttp2", "OpenSSL", "zlib");
 
-		if (bWindows)
+		if (Target.Platform == UnrealTargetPlatform.Win64)
 		{
-			// Unreal's audio capture captures the microphone, and its resampler
-			// converts it to the sample rate the bot is sent.
+			// What the WebSocket transport's libraries need from Windows.
+			PublicSystemLibraries.AddRange(new string[] { "ws2_32.lib", "iphlpapi.lib", "bcrypt.lib" });
+		}
+
+		// The microphone: SDL captures it on Linux (PipecatMicrophoneSDL.cpp),
+		// since Unreal's audio capture has no Linux backend, and Unreal's audio
+		// capture elsewhere (PipecatMicrophoneAudioCapture.cpp), with its
+		// resampler converting it to the sample rate the bot is sent.
+		if (Target.Platform == UnrealTargetPlatform.Linux)
+		{
+			AddEngineThirdPartyPrivateStaticDependencies(Target, "SDL3");
+		}
+		else
+		{
 			PrivateDependencyModuleNames.AddRange(new string[] {
 				"AudioCapture",
 				"AudioCaptureCore",
 				"AudioPlatformConfiguration",
 			});
-
-			// What the WebSocket transport's libraries need from Windows.
-			PublicSystemLibraries.AddRange(new string[] { "ws2_32.lib", "iphlpapi.lib", "bcrypt.lib" });
-		}
-		else
-		{
-			// SDL captures the microphone, since Unreal's audio capture has no
-			// Linux backend.
-			AddEngineThirdPartyPrivateStaticDependencies(Target, "SDL3");
 		}
 	}
 }

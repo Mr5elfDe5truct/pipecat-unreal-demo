@@ -7,25 +7,32 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "HAL/CriticalSection.h"
-
-#if PLATFORM_WINDOWS
-#include "AudioCaptureCore.h"
-#include "AudioResampler.h"
-#endif
 
 #include <atomic>
 
-struct SDL_AudioStream;
+// Captures the default microphone as 16-bit mono PCM, from when it starts until
+// it's destroyed. Each platform has its own: SDL's on Linux, where Unreal's
+// audio capture has no backend, and Unreal's audio capture elsewhere.
+class IPipecatMicrophoneCapture
+{
+public:
+	// Called on the capture's audio thread.
+	using FOnAudio = TFunction<void(const int16* Frames, int32 NumFrames)>;
+
+	// Starts capturing at the given sample rate, or returns null if it can't.
+	static TUniquePtr<IPipecatMicrophoneCapture> Start(int32 SampleRate, FOnAudio OnAudio);
+
+	// Stops capturing, once OnAudio has returned.
+	virtual ~IPipecatMicrophoneCapture() = default;
+};
 
 // Captures the default microphone as 16-bit mono PCM, and passes it on in
-// 10 ms chunks. It uses Unreal's audio capture on Windows, and SDL on Linux,
-// where Unreal's audio capture has no backend.
+// 10 ms chunks.
 class FPipecatMicrophone
 {
 public:
 	// Called on the audio thread.
-	using FOnAudio = TFunction<void(const int16* Frames, int32 NumFrames)>;
+	using FOnAudio = IPipecatMicrophoneCapture::FOnAudio;
 
 	~FPipecatMicrophone();
 
@@ -38,24 +45,7 @@ public:
 private:
 	void HandleAudio(const int16* Frames, int32 NumFrames);
 
-#if PLATFORM_WINDOWS
-	void OnCapture(const float* Samples, int32 NumFrames, int32 NumChannels, int32 CaptureSampleRate);
-
-	Audio::FAudioCapture Capture;
-	Audio::FResampler Resampler;
-	int32 SampleRate = 0;
-	// The microphone's sample rate the resampler converts from.
-	int32 ResampledSampleRate = 0;
-	// Only used on the audio thread.
-	TArray<float> Mono;
-	TArray<float> Resampled;
-	TArray<int16> Converted;
-#else
-	static void OnStreamData(void* UserData, SDL_AudioStream* Stream, int AdditionalAmount, int TotalAmount);
-
-	SDL_AudioStream* Stream = nullptr;
-#endif
-
+	TUniquePtr<IPipecatMicrophoneCapture> Capture;
 	FOnAudio OnAudio;
 	int32 FramesPerChunk = 0;
 	TArray<int16> Pending;
