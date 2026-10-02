@@ -22,22 +22,18 @@ public class Pipecat : ModuleRules
 			"Engine",
 		});
 
-		// The Pipecat C++ client and its Daily transport, built with Unreal's
-		// toolchain by ThirdParty/build-linux.sh, and the Daily Core shared
-		// library.
+		// The Pipecat C++ client and its WebSocket transport, with the libraries
+		// they need, built with Unreal's toolchain by ThirdParty/build-linux.sh.
 		string ThirdParty = Path.Combine(PluginDirectory, "ThirdParty", "Linux");
 		PublicSystemIncludePaths.Add(Path.Combine(ThirdParty, "include"));
-		PublicAdditionalLibraries.Add(Path.Combine(ThirdParty, "lib", "libpipecat_daily.a"));
-		PublicAdditionalLibraries.Add(Path.Combine(ThirdParty, "lib", "libpipecat.a"));
-		PublicAdditionalLibraries.Add(Path.Combine(ThirdParty, "lib", "libdaily_core.so"));
-		// Next to the module, where its rpath ($ORIGIN) finds it.
-		RuntimeDependencies.Add(
-			"$(BinaryOutputDir)/libdaily_core.so",
-			Path.Combine(ThirdParty, "lib", "libdaily_core.so")
-		);
+		foreach (string Library in Directory.GetFiles(Path.Combine(ThirdParty, "lib"), "*.a"))
+		{
+			PublicAdditionalLibraries.Add(Library);
+		}
 
-		// libcurl (with the libraries it needs) starts bots, and SDL captures
-		// the microphone, since Unreal's audio capture has no Linux backend.
+		// libcurl (with the libraries it needs) starts bots, OpenSSL secures the
+		// WebSocket, and SDL captures the microphone, since Unreal's audio
+		// capture has no Linux backend.
 		AddEngineThirdPartyPrivateStaticDependencies(Target, "libcurl", "nghttp2", "OpenSSL", "zlib", "SDL3");
 	}
 }

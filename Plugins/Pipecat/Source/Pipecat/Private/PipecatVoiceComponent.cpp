@@ -14,13 +14,14 @@
 #include "Sound/SoundWaveProcedural.h"
 
 THIRD_PARTY_INCLUDES_START
-#include <pipecat/daily/transport.h>
 #include <pipecat/pipecat.h>
+#include <pipecat/websocket/transport.h>
 THIRD_PARTY_INCLUDES_END
 
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <map>
 #include <set>
 #include <string>
 #include <thread>
@@ -35,9 +36,8 @@ namespace
 const uint32 UserSampleRate = 16000;
 const uint32 BotSampleRate = 48000;
 
-// The most bot voice Unreal can have waiting to be played. Unreal doesn't play
-// sounds while the game is paused, or in the background in the editor, and
-// anything beyond this is dropped, so the voice is never further behind.
+// The most bot voice Unreal has waiting to be played. The bot sends its voice
+// faster than it plays, so it's read as Unreal needs it.
 const int32 MaxQueuedBotVoiceBytes = BotSampleRate * 3 / 10 * sizeof(int16);
 
 FString ToFString(const std::string& Text)
@@ -70,24 +70,24 @@ public:
 	FPipecatSession(
 		UPipecatVoiceComponent* InOwner,
 		USoundWaveProcedural* InWave,
-		const TMap<FString, FPipecatFunctionHandler>& Functions)
+		const TMap<FString, FPipecatFunctionHandler>& InFunctions)
 		: Owner(InOwner), Wave(InWave)
 	{
-		pipecat::DailyTransportOptions TransportOptions;
+		for (const TPair<FString, FPipecatFunctionHandler>& Function : InFunctions)
+		{
+			Functions.emplace(ToStdString(Function.Key), Function.Value);
+		}
+
+		pipecat::WebSocketTransportOptions TransportOptions;
 		TransportOptions.user_audio_sample_rate = UserSampleRate;
 		TransportOptions.user_audio_channels = 1;
 		TransportOptions.bot_audio_sample_rate = BotSampleRate;
 		TransportOptions.bot_audio_channels = 1;
 
 		pipecat::PipecatClientOptions Options;
-		Options.transport = std::make_unique<pipecat::DailyTransport>(TransportOptions);
+		Options.transport = std::make_unique<pipecat::WebSocketTransport>(TransportOptions);
 		Options.callbacks = this;
 		Client = std::make_unique<pipecat::PipecatClient>(std::move(Options));
-
-		for (const TPair<FString, FPipecatFunctionHandler>& Function : Functions)
-		{
-			RegisterFunction(Function.Key, Function.Value);
-		}
 
 		Running = true;
 		Reader = std::thread([this] { PlayBotVoice(); });
@@ -107,7 +107,7 @@ public:
 
 		pipecat::APIRequest Request;
 		Request.endpoint = ToStdString(StartUrl);
-		Request.request_data = {{"createDailyRoom", true}};
+		Request.request_data = {{"transport", "websocket"}};
 		if (!ApiKey.IsEmpty())
 		{
 			Request.headers["Authorization"] = "Bearer " + ToStdString(ApiKey);
@@ -219,6 +219,9 @@ public:
 
 	virtual void on_bot_stopped_speaking() override
 	{
+		// The bot doesn't send silence, so its voice isn't read until it speaks
+		// again.
+		BotLevel = 0.0f;
 		Post([](UPipecatVoiceComponent& C) { C.OnBotStoppedSpeaking.Broadcast(); });
 	}
 
@@ -249,6 +252,38 @@ public:
 		Post([Text](UPipecatVoiceComponent& C) { C.OnBotOutput.Broadcast(Text); });
 	}
 
+	virtual void on_llm_function_call_in_progress(
+		const pipecat::rtvi::LLMFunctionCallInProgressData& Data,
+		pipecat::FunctionCallResultCallback Respond) override
+	{
+		auto Function = Data.function_name ? Functions.find(*Data.function_name) : Functions.end();
+		if (Function == Functions.end())
+		{
+			// E.g. a function the bot runs itself.
+			return;
+		}
+
+		// Game functions run on the game thread.
+		TWeakObjectPtr<UPipecatVoiceComponent> WeakOwner = Owner;
+		FPipecatFunctionHandler Handler = Function->second;
+		FString Arguments = ToFString(Data.arguments.dump());
+		AsyncTask(ENamedThreads::GameThread, [WeakOwner, Handler, Arguments, Respond]() {
+			if (!WeakOwner.IsValid())
+			{
+				Respond({{"error", "The game isn't running"}});
+				return;
+			}
+			Handler(Arguments, [Respond](const FString& ResultJson) {
+				nlohmann::json Result = nlohmann::json::parse(ToStdString(ResultJson), nullptr, false);
+				if (Result.is_discarded())
+				{
+					Result = ToStdString(ResultJson);
+				}
+				Respond(Result);
+			});
+		});
+	}
+
 private:
 	template <typename F>
 	void Post(F&& Fn)
@@ -267,37 +302,17 @@ private:
 		Post([Error](UPipecatVoiceComponent& C) { C.OnError.Broadcast(Error); });
 	}
 
-	void RegisterFunction(const FString& Name, FPipecatFunctionHandler Handler)
-	{
-		TWeakObjectPtr<UPipecatVoiceComponent> WeakOwner = Owner;
-		Client->register_function_call_handler(
-			ToStdString(Name),
-			[WeakOwner, Handler](const pipecat::FunctionCallParams& Params, pipecat::FunctionCallResultCallback Respond) {
-				FString Arguments = ToFString(Params.arguments.dump());
-				AsyncTask(ENamedThreads::GameThread, [WeakOwner, Handler, Arguments, Respond]() {
-					if (!WeakOwner.IsValid())
-					{
-						Respond({{"error", "The game isn't running"}});
-						return;
-					}
-					Handler(Arguments, [Respond](const FString& ResultJson) {
-						nlohmann::json Result = nlohmann::json::parse(ToStdString(ResultJson), nullptr, false);
-						if (Result.is_discarded())
-						{
-							Result = ToStdString(ResultJson);
-						}
-						Respond(Result);
-					});
-				});
-			});
-	}
-
 	// Reads the bot's voice and queues it on the sound wave the owner plays.
 	void PlayBotVoice()
 	{
 		std::vector<int16> Frames(BotSampleRate / 100);
 		while (Running)
 		{
+			if (Wave->GetAvailableAudioByteCount() >= MaxQueuedBotVoiceBytes)
+			{
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				continue;
+			}
 			int32 Read = Client->read_bot_audio(Frames.data(), Frames.size());
 			if (Read <= 0)
 			{
@@ -307,11 +322,7 @@ private:
 				continue;
 			}
 			BotLevel = Loudness(Frames.data(), Read);
-			if (Wave->GetAvailableAudioByteCount() < MaxQueuedBotVoiceBytes)
-			{
-				Wave->QueueAudio(reinterpret_cast<const uint8*>(Frames.data()), Read * sizeof(int16));
-			}
-
+			Wave->QueueAudio(reinterpret_cast<const uint8*>(Frames.data()), Read * sizeof(int16));
 		}
 	}
 
@@ -329,6 +340,8 @@ private:
 
 	// Only used on the client's thread.
 	std::set<int64_t> OutputSegments;
+	// The game functions the bot can call, by name.
+	std::map<std::string, FPipecatFunctionHandler> Functions;
 };
 
 UPipecatVoiceComponent::UPipecatVoiceComponent()
