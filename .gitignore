@@ -6,8 +6,9 @@ DerivedDataCache/
 Plugins/*/Binaries/
 Plugins/*/Intermediate/
 
-# Copied from the engine by setup.sh or setup.ps1.
-Content/
+# Copied from the engine by setup.sh or setup.ps1, except the splash screens.
+/Content/*
+!/Content/Splash/
 
 # Built by Plugins/Pipecat/ThirdParty/build-linux.sh or build-windows.ps1.
 Plugins/Pipecat/ThirdParty/build/

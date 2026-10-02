@@ -231,6 +231,8 @@ other meshes, e.g. from [Fab](https://www.fab.com), by listing them as
   scripts that build the Pipecat C++ client for it.
 - `Source/PipecatDemo`: the demo: the orb, the world and the subtitles.
 - `pipecat`: the bot.
+- `Content/Splash`: the splash screen, which the editor and the game show as
+  they start.
 - `Scripts/create_materials.py`: creates the demo's materials, for `setup.sh`
   and `setup.ps1`.
 
