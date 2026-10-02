@@ -14,14 +14,20 @@ with the [Pipecat C++ client](https://github.com/pipecat-ai/pipecat-client-cxx).
 
 ## 📋 Requirements
 
-- Linux, on x86_64. The demo only builds on Linux for now.
-- [Unreal Engine 5.8](https://www.unrealengine.com/en-US/linux), e.g. Epic's
-  binary build for Linux.
+- Linux or Windows, on x86_64.
+- Unreal Engine 5.8: Epic's
+  [binary build for Linux](https://www.unrealengine.com/en-US/linux), or, on
+  Windows, the one the Epic Games Launcher installs.
 - The Pipecat C++ client's source:
   ```
   git clone https://github.com/pipecat-ai/pipecat-client-cxx
   ```
 - CMake, Ninja and Git, to build the client.
+- On Windows, [Visual Studio](https://visualstudio.microsoft.com/downloads/)
+  or its Build Tools, with the "Desktop development with C++" workload, and
+  these components of it:
+  - "C++ CMake tools for Windows", which come with CMake and Ninja.
+  - ".NET Framework 4.8 SDK", which Unreal Engine needs to build its editor.
 - [uv](https://docs.astral.sh/uv/), to run the bot.
 - API keys for [Deepgram](https://console.deepgram.com),
   [OpenAI](https://platform.openai.com/api-keys) and
@@ -37,6 +43,10 @@ Get the demo:
 git clone https://github.com/pipecat-ai/pipecat-unreal-demo
 cd pipecat-unreal-demo
 ```
+
+Then follow the steps for [Linux](#linux) or [Windows](#windows).
+
+### Linux
 
 Tell the scripts where Unreal Engine and the Pipecat C++ client are:
 
@@ -70,6 +80,44 @@ Then, from this directory:
    ./setup.sh
    ```
 
+### Windows
+
+In PowerShell, tell the scripts where Unreal Engine and the Pipecat C++ client
+are:
+
+```
+$env:UE_ROOT = "C:\Program Files\Epic Games\UE_5.8"
+$env:PIPECAT_CLIENT_CXX = "C:\path\to\pipecat-client-cxx"
+```
+
+If PowerShell doesn't let you run scripts, allow them in this terminal first:
+
+```
+Set-ExecutionPolicy -Scope Process Bypass
+```
+
+Then, from this directory:
+
+1. Build the Pipecat C++ client and its WebSocket transport with Visual
+   Studio's compiler, which the script finds. They're installed in
+   `Plugins\Pipecat\ThirdParty\Win64`, for the Pipecat plugin.
+
+   ```
+   .\Plugins\Pipecat\ThirdParty\build-windows.ps1
+   ```
+
+2. Build the demo:
+
+   ```
+   & "$env:UE_ROOT\Engine\Build\BatchFiles\Build.bat" PipecatDemoEditor Win64 Development -Project="$PWD\PipecatDemo.uproject"
+   ```
+
+3. Set up its content, as on Linux, once the demo is built:
+
+   ```
+   .\setup.ps1
+   ```
+
 ## 🚀 Run
 
 1. Start the bot, with your API keys in `pipecat/.env`:
@@ -82,17 +130,29 @@ Then, from this directory:
 
    It waits for the game at `http://localhost:7860`.
 
-2. In another terminal, from this directory, open the demo in the editor, and
-   press Play:
+2. In another terminal, from this directory, with `UE_ROOT` set as for the
+   build, open the demo in the editor, and press Play. On Linux:
 
    ```
    "$UE_ROOT/Engine/Binaries/Linux/UnrealEditor" "$PWD/PipecatDemo.uproject"
    ```
 
-   Or run it as a game, without the editor:
+   On Windows, in PowerShell:
+
+   ```
+   & "$env:UE_ROOT\Engine\Binaries\Win64\UnrealEditor.exe" "$PWD\PipecatDemo.uproject"
+   ```
+
+   Or run it as a game, without the editor, by adding `-game`. On Linux:
 
    ```
    "$UE_ROOT/Engine/Binaries/Linux/UnrealEditor" "$PWD/PipecatDemo.uproject" -game
+   ```
+
+   On Windows:
+
+   ```
+   & "$env:UE_ROOT\Engine\Binaries\Win64\UnrealEditor.exe" "$PWD\PipecatDemo.uproject" -game
    ```
 
 The orb connects to the bot, greets you, and listens. Then talk to it, e.g.:
@@ -160,7 +220,8 @@ other meshes, e.g. from [Fab](https://www.fab.com), by listing them as
   scripts that build the Pipecat C++ client for it.
 - `Source/PipecatDemo`: the demo: the orb, the world and the subtitles.
 - `pipecat`: the bot.
-- `Scripts/create_materials.py`: creates the demo's materials, for `setup.sh`.
+- `Scripts/create_materials.py`: creates the demo's materials, for `setup.sh`
+  and `setup.ps1`.
 
 ## 📄 License
 
