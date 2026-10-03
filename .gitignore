@@ -10,9 +10,11 @@ Plugins/*/Intermediate/
 /Content/*
 !/Content/Splash/
 
-# Built by Plugins/Pipecat/ThirdParty/build-linux.sh or build-windows.ps1.
+# Built by Plugins/Pipecat/ThirdParty/build-linux.sh, build-mac.sh or
+# build-windows.ps1.
 Plugins/Pipecat/ThirdParty/build/
 Plugins/Pipecat/ThirdParty/Linux/
+Plugins/Pipecat/ThirdParty/Mac/
 Plugins/Pipecat/ThirdParty/Win64/
 
 # Editor project files.

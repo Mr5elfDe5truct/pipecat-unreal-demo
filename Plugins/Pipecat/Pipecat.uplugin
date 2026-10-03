@@ -15,6 +15,7 @@
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
 				"Linux",
+				"Mac",
 				"Win64"
 			]
 		}
@@ -24,6 +25,7 @@
 			"Name": "AudioCapture",
 			"Enabled": true,
 			"PlatformAllowList": [
+				"Mac",
 				"Win64"
 			]
 		}
