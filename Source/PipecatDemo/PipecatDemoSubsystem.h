@@ -11,8 +11,10 @@
 
 #include "PipecatDemoSubsystem.generated.h"
 
-// Builds the world the bot changes, and adds the Pipecat companion to it, when
-// play begins.
+class APipecatWorld;
+
+// Builds the world, and adds the Pipecat companion to it, when play begins.
+// The companion's bot owns the world, and the game builds what it sends.
 UCLASS(Config = Game)
 class UPipecatDemoSubsystem : public UWorldSubsystem
 {
@@ -25,4 +27,10 @@ public:
 
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
 	virtual void OnWorldBeginPlay(UWorld& World) override;
+
+private:
+	UFUNCTION()
+	void HandleServerMessage(const FString& DataJson);
+
+	TWeakObjectPtr<APipecatWorld> Environment;
 };

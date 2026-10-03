@@ -17,11 +17,7 @@ class USoundWaveProcedural;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FPipecatEvent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPipecatTextEvent, const FString&, Text);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPipecatTranscriptEvent, const FString&, Text, bool, bFinal);
-
-// Reacts to the bot's LLM calling a function, on the game thread, with the
-// call's arguments as JSON. The bot runs the function and gives the LLM its
-// result.
-using FPipecatFunctionHandler = TFunction<void(const FString& ArgumentsJson)>;
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPipecatMessageEvent, const FString&, DataJson);
 
 /**
  * Talks to a Pipecat bot with voice: starts the bot, sends it the microphone,
@@ -81,9 +77,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Pipecat")
 	float GetMicrophoneLevel() const;
 
-	/** Reacts to calls to one of the bot's functions. Register it before connecting. */
-	void RegisterFunction(const FString& Name, FPipecatFunctionHandler Handler);
-
 	/** The bot is ready to talk. */
 	UPROPERTY(BlueprintAssignable, Category = "Pipecat")
 	FPipecatEvent OnBotReady;
@@ -120,6 +113,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Pipecat")
 	FPipecatTextEvent OnBotOutput;
 
+	/** A message the bot sent the game, with its data as JSON. */
+	UPROPERTY(BlueprintAssignable, Category = "Pipecat")
+	FPipecatMessageEvent OnServerMessage;
+
 	virtual void TickComponent(
 		float DeltaTime,
 		ELevelTick TickType,
@@ -137,5 +134,4 @@ private:
 	TObjectPtr<USoundWaveProcedural> VoiceWave;
 
 	TSharedPtr<class FPipecatSession> Session;
-	TMap<FString, FPipecatFunctionHandler> Functions;
 };

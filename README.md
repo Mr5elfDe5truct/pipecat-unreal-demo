@@ -194,10 +194,12 @@ is what the orb can change:
   has a voice component from the Pipecat plugin, in `Plugins/Pipecat`, which
   starts the bot and talks to it with the Pipecat C++ client: it sends the
   bot the microphone, and plays the bot's voice from the orb.
-- The bot, in `pipecat/bot.py`, has one function, `set_environment`, which
-  the LLM calls with what to change. The bot answers the call itself, and
-  Pipecat tells the game about it, with what to change. The game's world then
-  changes to the new look.
+- The bot, in `pipecat/bot.py`, owns the world: its settings, like the time
+  of day or the trees. When you ask for a change, its LLM calls
+  `set_environment`, and the bot changes them.
+- When the world changes, the bot sends the game its settings, as an RTVI
+  server message, and the game's world changes to the new look. The game only
+  renders the world: the same settings always build the same world.
 - The orb glows as it speaks, you glow as you speak, and subtitles show what
   you both say.
 

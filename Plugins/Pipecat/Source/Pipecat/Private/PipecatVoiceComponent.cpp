@@ -21,7 +21,6 @@ THIRD_PARTY_INCLUDES_END
 #include <atomic>
 #include <chrono>
 #include <cmath>
-#include <map>
 #include <set>
 #include <string>
 #include <thread>
@@ -67,17 +66,9 @@ float Loudness(const int16* Frames, int32 NumFrames)
 class FPipecatSession : public pipecat::PipecatClientCallbacks
 {
 public:
-	FPipecatSession(
-		UPipecatVoiceComponent* InOwner,
-		USoundWaveProcedural* InWave,
-		const TMap<FString, FPipecatFunctionHandler>& InFunctions)
+	FPipecatSession(UPipecatVoiceComponent* InOwner, USoundWaveProcedural* InWave)
 		: Owner(InOwner), Wave(InWave)
 	{
-		for (const TPair<FString, FPipecatFunctionHandler>& Function : InFunctions)
-		{
-			Functions.emplace(ToStdString(Function.Key), Function.Value);
-		}
-
 		pipecat::WebSocketTransportOptions TransportOptions;
 		TransportOptions.user_audio_sample_rate = UserSampleRate;
 		TransportOptions.user_audio_channels = 1;
@@ -252,20 +243,10 @@ public:
 		Post([Text](UPipecatVoiceComponent& C) { C.OnBotOutput.Broadcast(Text); });
 	}
 
-	virtual void on_llm_function_call_in_progress(
-		const pipecat::rtvi::LLMFunctionCallInProgressData& Data,
-		pipecat::FunctionCallResultCallback /* Respond */) override
+	virtual void on_server_message(const nlohmann::json& Data) override
 	{
-		// The bot runs its functions and gives its LLM the results, so the
-		// game only reacts to them, and never responds.
-		auto Function = Data.function_name ? Functions.find(*Data.function_name) : Functions.end();
-		if (Function == Functions.end())
-		{
-			return;
-		}
-		FPipecatFunctionHandler Handler = Function->second;
-		FString Arguments = ToFString(Data.arguments.dump());
-		Post([Handler, Arguments](UPipecatVoiceComponent&) { Handler(Arguments); });
+		FString DataJson = ToFString(Data.dump());
+		Post([DataJson](UPipecatVoiceComponent& C) { C.OnServerMessage.Broadcast(DataJson); });
 	}
 
 private:
@@ -324,8 +305,6 @@ private:
 
 	// Only used on the client's thread.
 	std::set<int64_t> OutputSegments;
-	// The game functions the bot can call, by name.
-	std::map<std::string, FPipecatFunctionHandler> Functions;
 };
 
 UPipecatVoiceComponent::UPipecatVoiceComponent()
@@ -403,7 +382,7 @@ void UPipecatVoiceComponent::Connect()
 {
 	if (!Session)
 	{
-		Session = MakeShared<FPipecatSession>(this, VoiceWave, Functions);
+		Session = MakeShared<FPipecatSession>(this, VoiceWave);
 	}
 	Session->Start(StartUrl, ApiKey, bUseMicrophone);
 }
@@ -438,9 +417,4 @@ float UPipecatVoiceComponent::GetBotVoiceLevel() const
 float UPipecatVoiceComponent::GetMicrophoneLevel() const
 {
 	return Session ? Session->GetMicrophoneLevel() : 0.0f;
-}
-
-void UPipecatVoiceComponent::RegisterFunction(const FString& Name, FPipecatFunctionHandler Handler)
-{
-	Functions.Add(Name, MoveTemp(Handler));
 }

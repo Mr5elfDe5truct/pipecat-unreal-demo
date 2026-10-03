@@ -6,10 +6,11 @@
 
 """The orb's bot: a voice agent that reshapes the game's world.
 
-It hears the player with Deepgram, answers with OpenAI and speaks with Cartesia.
-The game connects to it over a WebSocket. When the player asks for a change,
-the LLM calls ``set_environment``, which the game receives, with its arguments,
-and applies.
+``PlayerWorker`` talks to the player: it hears them with Deepgram, answers with
+OpenAI and speaks with Cartesia. It owns the world: the settings the game
+builds it from. When the player asks for a change, the LLM calls
+``set_environment``, and the game gets the world's new settings, as an RTVI
+server message. The game connects over a WebSocket, and only renders the world.
 
 Run it with ``uv run bot.py -t websocket``.
 """
@@ -29,7 +30,6 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.processors.frameworks.rtvi import RTVIFunctionCallReportLevel, RTVIObserverParams
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
@@ -86,6 +86,19 @@ SET_ENVIRONMENT = FunctionSchema(
     required=[],
 )
 
+# The world as it starts: an empty grid under a clear midday sky.
+INITIAL_ENVIRONMENT = {
+    "time_of_day": "noon",
+    "fog": "none",
+    "clouds": "clear",
+    "terrain": "flat",
+    "grass": "none",
+    "trees": "none",
+    "pond": False,
+    "lake": False,
+    "river": False,
+}
+
 transport_params = {
     "websocket": lambda: FastAPIWebsocketParams(
         audio_in_enabled=True,
@@ -96,81 +109,82 @@ transport_params = {
 }
 
 
-async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
-    """Runs the bot with the given transport."""
-    # What the world looks like, as the game starts it.
-    environment = {
-        "time_of_day": "noon",
-        "fog": "none",
-        "clouds": "clear",
-        "terrain": "flat",
-        "grass": "none",
-        "trees": "none",
-        "pond": False,
-        "lake": False,
-        "river": False,
-    }
+class PlayerWorker(PipelineWorker):
+    """Talks to the player, and owns the world their game renders."""
 
-    async def set_environment(params: FunctionCallParams):
-        # The game applies the change when it's told about the call. Tell the
-        # LLM what the world looks like now.
-        environment.update({k: v for k, v in params.arguments.items() if k in environment})
-        logger.info(f"Environment: {environment}")
-        await params.result_callback(environment)
+    def __init__(self, transport: BaseTransport):
+        stt = DeepgramSTTService(api_key=os.environ["DEEPGRAM_API_KEY"])
 
-    tts = CartesiaTTSService(
-        api_key=os.environ["CARTESIA_API_KEY"],
-        settings=CartesiaTTSService.Settings(voice=os.environ["CARTESIA_VOICE_ID"]),
-    )
+        llm = OpenAILLMService(
+            api_key=os.environ["OPENAI_API_KEY"],
+            settings=OpenAILLMService.Settings(system_instruction=SYSTEM_INSTRUCTION),
+        )
+        llm.register_function("set_environment", self._set_environment)
 
-    stt = DeepgramSTTService(api_key=os.environ["DEEPGRAM_API_KEY"])
+        tts = CartesiaTTSService(
+            api_key=os.environ["CARTESIA_API_KEY"],
+            settings=CartesiaTTSService.Settings(voice=os.environ["CARTESIA_VOICE_ID"]),
+        )
 
-    llm = OpenAILLMService(
-        api_key=os.environ["OPENAI_API_KEY"],
-        settings=OpenAILLMService.Settings(system_instruction=SYSTEM_INSTRUCTION),
-    )
-    llm.register_function("set_environment", set_environment)
+        context = LLMContext(tools=ToolsSchema([SET_ENVIRONMENT]))
+        user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+            context,
+            user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+        )
 
-    context = LLMContext(tools=ToolsSchema([SET_ENVIRONMENT]))
-    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
-        context,
-        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
-    )
+        pipeline = Pipeline(
+            [
+                transport.input(),
+                stt,
+                user_aggregator,
+                llm,
+                tts,
+                transport.output(),
+                assistant_aggregator,
+            ]
+        )
 
-    pipeline = Pipeline(
-        [
-            transport.input(),
-            stt,
-            user_aggregator,
-            llm,
-            tts,
-            transport.output(),
-            assistant_aggregator,
-        ]
-    )
+        super().__init__(
+            pipeline,
+            name="player",
+            params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
+        )
+        self._context = context
+        self._environment = dict(INITIAL_ENVIRONMENT)
 
-    worker = PipelineWorker(
-        pipeline,
-        params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
-        # The game needs the function's name and arguments to apply it.
-        rtvi_observer_params=RTVIObserverParams(
-            function_call_report_level={"set_environment": RTVIFunctionCallReportLevel.FULL}
-        ),
-    )
+        self.rtvi.add_event_handler("on_client_ready", self._on_client_ready)
+        transport.add_event_handler("on_client_disconnected", self._on_client_disconnected)
 
-    @worker.rtvi.event_handler("on_client_ready")
-    async def on_client_ready(rtvi):
-        context.add_message(
+    async def _on_client_ready(self, rtvi):
+        # The game renders the world the bot owns.
+        await self._send_environment()
+        self._context.add_message(
             {"role": "developer", "content": "Please introduce yourself to the user."}
         )
-        await worker.queue_frames([LLMRunFrame()])
+        await self.queue_frames([LLMRunFrame()])
 
-    @transport.event_handler("on_client_disconnected")
-    async def on_client_disconnected(transport, client):
-        await worker.cancel()
+    async def _on_client_disconnected(self, transport, client):
+        await self.cancel()
 
+    async def _set_environment(self, params: FunctionCallParams):
+        self._environment.update(
+            {k: v for k, v in params.arguments.items() if k in self._environment}
+        )
+        logger.info(f"Environment: {self._environment}")
+        await self._send_environment()
+        # Tell the LLM what the world looks like now.
+        await params.result_callback(self._environment)
+
+    async def _send_environment(self):
+        await self.rtvi.send_server_message(
+            {"type": "environment", "environment": self._environment}
+        )
+
+
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+    """Runs the bot with the given transport."""
     runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
-    await runner.add_workers(worker)
+    await runner.add_workers(PlayerWorker(transport))
     await runner.run()
 
 

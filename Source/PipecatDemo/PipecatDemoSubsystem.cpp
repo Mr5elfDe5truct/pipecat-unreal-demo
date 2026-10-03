@@ -37,7 +37,7 @@ void UPipecatDemoSubsystem::OnWorldBeginPlay(UWorld& World)
 	FParse::Value(FCommandLine::Get(), TEXT("PipecatApiKey="), ApiKey);
 
 	// The world the bot changes, which starts as an empty grid.
-	APipecatWorld* Environment = World.SpawnActor<APipecatWorld>();
+	Environment = World.SpawnActor<APipecatWorld>();
 
 	APipecatCompanion* Companion = World.SpawnActorDeferred<APipecatCompanion>(
 		APipecatCompanion::StaticClass(), FTransform(FVector(0.0f, 0.0f, 300.0f)));
@@ -56,19 +56,23 @@ void UPipecatDemoSubsystem::OnWorldBeginPlay(UWorld& World)
 	Companion->Voice->bUseMicrophone = !FParse::Param(FCommandLine::Get(), TEXT("PipecatNoMicrophone"));
 	FParse::Value(FCommandLine::Get(), TEXT("PipecatSay="), Companion->FirstMessage);
 
-	// The bot changes the world with set_environment, e.g. with
-	// {"time_of_day": "sunset"}. It keeps track of the world itself.
-	TWeakObjectPtr<APipecatWorld> WeakEnvironment = Environment;
-	Companion->Voice->RegisterFunction(
-		TEXT("set_environment"),
-		[WeakEnvironment](const FString& ArgumentsJson) {
-			TSharedPtr<FJsonObject> Changes;
-			if (WeakEnvironment.IsValid() &&
-				FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(ArgumentsJson), Changes) && Changes)
-			{
-				WeakEnvironment->SetEnvironment(*Changes);
-			}
-		});
+	// The bot owns the world, and sends its settings when the game connects
+	// and whenever they change.
+	Companion->Voice->OnServerMessage.AddDynamic(this, &UPipecatDemoSubsystem::HandleServerMessage);
 
 	Companion->FinishSpawning(FTransform(FVector(0.0f, 0.0f, 300.0f)));
+}
+
+void UPipecatDemoSubsystem::HandleServerMessage(const FString& DataJson)
+{
+	// E.g. {"type": "environment", "environment": {"time_of_day": "sunset", ...}}.
+	TSharedPtr<FJsonObject> Message;
+	FString Type;
+	const TSharedPtr<FJsonObject>* Settings = nullptr;
+	if (Environment.IsValid() && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(DataJson), Message) &&
+		Message && Message->TryGetStringField(TEXT("type"), Type) && Type == TEXT("environment") &&
+		Message->TryGetObjectField(TEXT("environment"), Settings))
+	{
+		Environment->SetEnvironment(**Settings);
+	}
 }
