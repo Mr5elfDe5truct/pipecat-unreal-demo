@@ -1,3 +1,9 @@
+<h1><div align="center">
+ <img alt="pipecat" width="300px" height="auto" src="pipecat.png">
+</div></h1>
+
+[![Docs](https://img.shields.io/badge/Documentation-blue)](https://docs.pipecat.ai) [![Discord](https://img.shields.io/discord/1239284677165056021)](https://discord.gg/pipecat)
+
 # Pipecat Unreal Engine Demo
 
 This demo shows how to bring a [Pipecat](https://github.com/pipecat-ai/pipecat)
@@ -11,6 +17,10 @@ some fog or a sunset, and the world changes around you as it answers.
 The orb is a Pipecat bot, a voice agent that hears you with Deepgram, answers
 with OpenAI and speaks with Cartesia. The game talks to it over a WebSocket
 with the [Pipecat C++ client](https://github.com/pipecat-ai/pipecat-client-cxx).
+
+<p align="center">
+ <img alt="The orb next to the player, by a lake at sunset" src="pipecat-unreal-demo.png">
+</p>
 
 ## 📋 Requirements
 
