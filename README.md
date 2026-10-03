@@ -24,15 +24,22 @@ with the [Pipecat C++ client](https://github.com/pipecat-ai/pipecat-client-cxx).
 
 ## 📋 Requirements
 
-- Linux or Windows, on x86_64.
+- Linux or Windows on x86_64, or macOS.
 - Unreal Engine 5.8: Epic's
   [binary build for Linux](https://www.unrealengine.com/en-US/linux), or, on
-  Windows, the one the Epic Games Launcher installs.
+  macOS and Windows, the one the Epic Games Launcher installs.
 - The Pipecat C++ client's source:
   ```
   git clone https://github.com/pipecat-ai/pipecat-client-cxx
   ```
 - CMake, Ninja and Git, to build the client.
+- On macOS, [Xcode](https://apps.apple.com/app/xcode/id497799835) 15.2 or
+  newer, which Unreal Engine builds with. Its Command Line Tools aren't
+  enough. Xcode comes with Git, and [Homebrew](https://brew.sh) has CMake and
+  Ninja:
+  ```
+  brew install cmake ninja
+  ```
 - On Windows, [Visual Studio](https://visualstudio.microsoft.com/downloads/)
   or its Build Tools, with the "Desktop development with C++" workload, and
   these components of it:
@@ -54,7 +61,8 @@ git clone https://github.com/pipecat-ai/pipecat-unreal-demo
 cd pipecat-unreal-demo
 ```
 
-Then follow the steps for [Linux](#linux) or [Windows](#windows).
+Then follow the steps for [Linux](#linux), [macOS](#macos) or
+[Windows](#windows).
 
 ### Linux
 
@@ -85,6 +93,53 @@ Then, from this directory:
    character, its animations and the input setup) into `Content/`, and creates
    the demo's materials in the editor, which is why the demo needs to be built
    first.
+
+   ```
+   ./setup.sh
+   ```
+
+### macOS
+
+Tell the scripts where Unreal Engine and the Pipecat C++ client are. The Epic
+Games Launcher installs Unreal Engine in `/Users/Shared/Epic Games`:
+
+```
+export UE_ROOT="/Users/Shared/Epic Games/UE_5.8"
+export PIPECAT_CLIENT_CXX=/path/to/pipecat-client-cxx
+```
+
+Unreal Engine builds with the Xcode that `xcode-select -p` shows. If it shows
+`/Library/Developer/CommandLineTools`, select Xcode, and accept its license:
+
+```
+sudo xcode-select -s /Applications/Xcode.app
+sudo xcodebuild -license accept
+```
+
+Unreal Engine also compiles its shaders with Xcode's Metal compiler, which
+Xcode 26 and newer download separately:
+
+```
+xcodebuild -downloadComponent MetalToolchain
+```
+
+Then, from this directory:
+
+1. Build the Pipecat C++ client and its WebSocket transport with Xcode's
+   compiler, for Apple silicon and Intel Macs. They're installed in
+   `Plugins/Pipecat/ThirdParty/Mac`, for the Pipecat plugin.
+
+   ```
+   ./Plugins/Pipecat/ThirdParty/build-mac.sh
+   ```
+
+2. Build the demo:
+
+   ```
+   "$UE_ROOT/Engine/Build/BatchFiles/Mac/Build.sh" PipecatDemoEditor Mac Development -Project="$PWD/PipecatDemo.uproject"
+   ```
+
+3. Set up its content, as on Linux, once the demo is built:
 
    ```
    ./setup.sh
@@ -158,6 +213,12 @@ setup.bat
    "$UE_ROOT/Engine/Binaries/Linux/UnrealEditor" "$PWD/PipecatDemo.uproject"
    ```
 
+   On macOS:
+
+   ```
+   "$UE_ROOT/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor" "$PWD/PipecatDemo.uproject"
+   ```
+
    On Windows, in PowerShell:
 
    ```
@@ -168,6 +229,12 @@ setup.bat
 
    ```
    "$UE_ROOT/Engine/Binaries/Linux/UnrealEditor" "$PWD/PipecatDemo.uproject" -game
+   ```
+
+   On macOS:
+
+   ```
+   "$UE_ROOT/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor" "$PWD/PipecatDemo.uproject" -game
    ```
 
    On Windows:

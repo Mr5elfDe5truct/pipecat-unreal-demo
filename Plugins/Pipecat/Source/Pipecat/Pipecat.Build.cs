@@ -24,7 +24,8 @@ public class Pipecat : ModuleRules
 
 		// The Pipecat C++ client and its WebSocket transport, with the libraries
 		// they need, built in ThirdParty/<platform>, e.g. ThirdParty/Linux, by
-		// ThirdParty/build-linux.sh with Unreal's toolchain, or by
+		// ThirdParty/build-linux.sh with Unreal's toolchain, by
+		// ThirdParty/build-mac.sh with Xcode's, or by
 		// ThirdParty/build-windows.ps1 with Visual Studio's.
 		string ThirdParty = Path.Combine(PluginDirectory, "ThirdParty", Target.Platform.ToString());
 		PublicSystemIncludePaths.Add(Path.Combine(ThirdParty, "include"));

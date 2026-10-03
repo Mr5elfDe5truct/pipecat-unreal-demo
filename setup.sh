@@ -8,6 +8,8 @@
 # install has the template. It creates the materials in the editor, with
 # Scripts/create_materials.py, so build the demo first.
 #
+# It's for Linux and macOS.
+#
 # Usage:
 #   UE_ROOT=/path/to/UnrealEngine ./setup.sh
 #
@@ -19,9 +21,20 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATES="$UE_ROOT/Templates"
 
-if [[ ! -f "$HERE/Binaries/Linux/libUnrealEditor-PipecatDemo.so" ]]; then
+if [[ "$(uname -s)" == Darwin ]]; then
+    PLATFORM=Mac
+    MODULE=libUnrealEditor-PipecatDemo.dylib
+    # macOS apps keep their logs in ~/Library/Logs.
+    LOG="$HOME/Library/Logs/Unreal Engine/PipecatDemoEditor/PipecatDemo.log"
+else
+    PLATFORM=Linux
+    MODULE=libUnrealEditor-PipecatDemo.so
+    LOG="$HERE/Saved/Logs/PipecatDemo.log"
+fi
+
+if [[ ! -f "$HERE/Binaries/$PLATFORM/$MODULE" ]]; then
     echo "Build the demo first, e.g.:"
-    echo "  $UE_ROOT/Engine/Build/BatchFiles/Linux/Build.sh PipecatDemoEditor Linux Development -Project=$HERE/PipecatDemo.uproject"
+    echo "  \"$UE_ROOT/Engine/Build/BatchFiles/$PLATFORM/Build.sh\" PipecatDemoEditor $PLATFORM Development -Project=\"$HERE/PipecatDemo.uproject\""
     exit 1
 fi
 
@@ -37,10 +50,10 @@ chmod -R u+w "$HERE/Content"
 
 echo "Copied the Third Person template content into $HERE/Content"
 
-if ! "$UE_ROOT/Engine/Binaries/Linux/UnrealEditor-Cmd" "$HERE/PipecatDemo.uproject" \
+if ! "$UE_ROOT/Engine/Binaries/$PLATFORM/UnrealEditor-Cmd" "$HERE/PipecatDemo.uproject" \
     -run=pythonscript -script="$HERE/Scripts/create_materials.py" \
     -EnablePlugins=PythonScriptPlugin -unattended -nosplash -nullrhi > /dev/null 2>&1; then
-    echo "Unable to create the demo's materials, see $HERE/Saved/Logs/PipecatDemo.log"
+    echo "Unable to create the demo's materials, see $LOG"
     exit 1
 fi
 echo "Created the demo's materials in $HERE/Content/Pipecat"
