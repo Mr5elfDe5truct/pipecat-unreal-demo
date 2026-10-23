@@ -341,8 +341,8 @@ void APipecatWorld::BeginPlay()
 	}
 
 	// Grass close to where the player starts, and trees everywhere but there.
-	Plant(Grass, GrassMeshes, 180.0f, 30000.0f, 0.0f, 1.0f, 2.2f);
-	Plant(Trees, TreeMeshes, 1000.0f, GroundSize, 1200.0f, 0.7f, 1.3f);
+	Plant(Grass, GrassMeshes, GrassSpacing, 30000.0f, 0.0f, 1.0f, 2.2f, GrassCullDistance, false);
+	Plant(Trees, TreeMeshes, TreeSpacing, GroundSize, 1200.0f, 0.7f, 1.3f, TreeCullDistance, true);
 
 	Show(Current);
 }
@@ -610,7 +610,9 @@ void APipecatWorld::Plant(
 	float Area,
 	float Clearing,
 	float MinSize,
-	float MaxSize)
+	float MaxSize,
+	float CullDistance,
+	bool bCastShadow)
 {
 	for (const FSoftObjectPath& Path : MeshPaths)
 	{
@@ -623,6 +625,17 @@ void APipecatWorld::Plant(
 		UInstancedStaticMeshComponent* Instances = NewObject<UInstancedStaticMeshComponent>(this);
 		Instances->SetStaticMesh(Mesh);
 		Instances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		// Detailed plants, like Fab's, are too many to draw, or to shadow,
+		// all the way to the horizon.
+		if (CullDistance > 0.0f)
+		{
+			Instances->SetCullDistances(FMath::RoundToInt(CullDistance * 0.8f), FMath::RoundToInt(CullDistance));
+		}
+		Instances->SetCastShadow(bCastShadow);
+		// Nor for Lumen to capture: capturing thousands of leafy trees into its
+		// surface cache hung the GPU.
+		Instances->bAffectDynamicIndirectLighting = false;
+		Instances->bAffectDistanceFieldLighting = false;
 		Instances->SetupAttachment(Ground);
 		Instances->RegisterComponent();
 		Plants.Meshes.Add(Instances);

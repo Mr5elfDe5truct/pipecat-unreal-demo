@@ -60,6 +60,20 @@ public:
 	UPROPERTY(Config)
 	TArray<FSoftObjectPath> TreeMeshes;
 
+	/** How far apart grass and trees grow, in centimeters. */
+	UPROPERTY(Config)
+	float GrassSpacing = 180.0f;
+
+	UPROPERTY(Config)
+	float TreeSpacing = 1000.0f;
+
+	/** How far away grass and trees are still drawn, or 0 for everywhere. */
+	UPROPERTY(Config)
+	float GrassCullDistance = 0.0f;
+
+	UPROPERTY(Config)
+	float TreeCullDistance = 0.0f;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -155,7 +169,9 @@ private:
 		float Area,
 		float Clearing,
 		float MinSize,
-		float MaxSize);
+		float MaxSize,
+		float CullDistance,
+		bool bCastShadow);
 	void StartChange(FPlants& Plants);
 	// Grows and shrinks plants, whose level is `Level` of the look, as far as
 	// `Progress` into the change.
