@@ -196,8 +196,14 @@ public:
 		Post([](UPipecatVoiceComponent& C) { C.OnUserStoppedSpeaking.Broadcast(); });
 	}
 
-	virtual void on_user_transcript(const pipecat::rtvi::TranscriptData& Data) override
+	virtual void on_user_input(const pipecat::rtvi::UserInputData& Data) override
 	{
+		// Only what the user said, not text sent with send_text() or
+		// backchannels.
+		if (Data.input_type != "transcription")
+		{
+			return;
+		}
 		FString Text = ToFString(Data.text);
 		bool bFinal = Data.final;
 		Post([Text, bFinal](UPipecatVoiceComponent& C) { C.OnUserTranscript.Broadcast(Text, bFinal); });

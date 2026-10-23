@@ -7,6 +7,7 @@
 #include "PipecatDemoSubsystem.h"
 
 #include "PipecatCompanion.h"
+#include "PipecatObjects.h"
 #include "PipecatVoiceComponent.h"
 #include "PipecatWorld.h"
 
@@ -38,6 +39,8 @@ void UPipecatDemoSubsystem::OnWorldBeginPlay(UWorld& World)
 
 	// The world the bot changes, which starts as an empty grid.
 	Environment = World.SpawnActor<APipecatWorld>();
+	// The objects the bot puts in it, which the player can use.
+	Objects = World.SpawnActor<APipecatObjects>();
 
 	APipecatCompanion* Companion = World.SpawnActorDeferred<APipecatCompanion>(
 		APipecatCompanion::StaticClass(), FTransform(FVector(0.0f, 0.0f, 300.0f)));
@@ -68,11 +71,25 @@ void UPipecatDemoSubsystem::HandleServerMessage(const FString& DataJson)
 	// E.g. {"type": "environment", "environment": {"time_of_day": "sunset", ...}}.
 	TSharedPtr<FJsonObject> Message;
 	FString Type;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(DataJson), Message) || !Message ||
+		!Message->TryGetStringField(TEXT("type"), Type))
+	{
+		return;
+	}
 	const TSharedPtr<FJsonObject>* Settings = nullptr;
-	if (Environment.IsValid() && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(DataJson), Message) &&
-		Message && Message->TryGetStringField(TEXT("type"), Type) && Type == TEXT("environment") &&
+	if (Type == TEXT("environment") && Environment.IsValid() &&
 		Message->TryGetObjectField(TEXT("environment"), Settings))
 	{
 		Environment->SetEnvironment(**Settings);
+	}
+	// E.g. {"type": "spawn", "object": "door"}, and {"type": "clear"}.
+	FString Name;
+	if (Type == TEXT("spawn") && Objects.IsValid() && Message->TryGetStringField(TEXT("object"), Name))
+	{
+		Objects->Spawn(Name);
+	}
+	if (Type == TEXT("clear") && Objects.IsValid())
+	{
+		Objects->Clear();
 	}
 }

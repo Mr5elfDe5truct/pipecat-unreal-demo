@@ -7,7 +7,8 @@
 """The orb's bot: a voice agent that reshapes the game's world.
 
 ``PlayerWorker`` talks to the player: it hears them with Deepgram, answers with
-OpenAI and speaks with Cartesia. It owns the world: the settings the game
+OpenAI, Gemini or a local Ollama model, and speaks with Cartesia or Deepgram,
+depending on which keys are set. It owns the world: the settings the game
 builds it from. When the player asks for a change, the LLM calls
 ``set_environment``, and the game gets the world's new settings, as an RTVI
 server message. The game connects over a WebSocket, and only renders the world.
@@ -55,6 +56,12 @@ right away, with only what changes, without saying anything first. Once it
 returns, say in a few words what you did, only once. If they ask for something
 you can't do yet, say so, and suggest something you can.
 
+You can also put objects in front of the player with the spawn_object function,
+and take them all away with clear_objects. Pick the closest object you have for
+what they ask for, and say what you made. The player uses doors, levers, boxes
+and people by walking up to them and pressing F, and the mouse wheel chooses
+what to do.
+
 Your output will be spoken, so don't use special characters. Keep your answers
 to one or two short sentences.
 """
@@ -86,6 +93,41 @@ SET_ENVIRONMENT = FunctionSchema(
     required=[],
 )
 
+# What the orb can make, which the game finds by these names in
+# Config/DefaultGame.ini.
+OBJECTS = {
+    "door": "A door in a frame, which opens and closes.",
+    "lever": "A lever, which can be pulled up or down.",
+    "npc": "A person, who the player can talk to.",
+    "interactive_box": "A box with things the player can do with it.",
+    "jump_pad": "A glowing pad, which launches the player into the air.",
+    "crate": "A plain crate, to climb on or build with.",
+    "ramp": "A ramp, to walk up.",
+    "pillar": "A tall round pillar.",
+}
+
+SPAWN_OBJECT = FunctionSchema(
+    name="spawn_object",
+    description=(
+        "Puts an object in front of the player. Call it once for each object they ask for."
+    ),
+    properties={
+        "object": {
+            "type": "string",
+            "enum": list(OBJECTS),
+            "description": "; ".join(f"{name}: {what}" for name, what in OBJECTS.items()),
+        },
+    },
+    required=["object"],
+)
+
+CLEAR_OBJECTS = FunctionSchema(
+    name="clear_objects",
+    description="Removes every object you put in the world.",
+    properties={},
+    required=[],
+)
+
 # The world as it starts: an empty grid under a clear midday sky.
 INITIAL_ENVIRONMENT = {
     "time_of_day": "noon",
@@ -109,24 +151,67 @@ transport_params = {
 }
 
 
+def create_llm():
+    """OpenAI or Gemini, whichever has a key, or else a local Ollama model."""
+    if os.environ.get("OPENAI_API_KEY"):
+        return OpenAILLMService(
+            api_key=os.environ["OPENAI_API_KEY"],
+            settings=OpenAILLMService.Settings(system_instruction=SYSTEM_INSTRUCTION),
+        )
+    if os.environ.get("GOOGLE_API_KEY"):
+        from pipecat.services.google.llm import GoogleLLMService
+
+        settings = GoogleLLMService.Settings(system_instruction=SYSTEM_INSTRUCTION)
+        if os.environ.get("GOOGLE_MODEL"):
+            settings.model = os.environ["GOOGLE_MODEL"]
+        return GoogleLLMService(api_key=os.environ["GOOGLE_API_KEY"], settings=settings)
+
+    from pipecat.services.ollama.llm import OLLamaLLMService
+
+    return OLLamaLLMService(
+        base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+        settings=OLLamaLLMService.Settings(
+            model=os.environ.get("OLLAMA_MODEL", "gemma4:e4b"),
+            system_instruction=SYSTEM_INSTRUCTION,
+            # Thinking models like Gemma 4 take seconds to think before each
+            # answer, too slow for a conversation.
+            extra={"reasoning_effort": "none"},
+        ),
+    )
+
+
+def create_tts():
+    """Cartesia if it has a key, or else Deepgram's own voices."""
+    if os.environ.get("CARTESIA_API_KEY"):
+        return CartesiaTTSService(
+            api_key=os.environ["CARTESIA_API_KEY"],
+            settings=CartesiaTTSService.Settings(voice=os.environ["CARTESIA_VOICE_ID"]),
+        )
+
+    from pipecat.services.deepgram.tts import DeepgramTTSService
+
+    return DeepgramTTSService(
+        api_key=os.environ["DEEPGRAM_API_KEY"],
+        settings=DeepgramTTSService.Settings(
+            voice=os.environ.get("DEEPGRAM_VOICE", "aura-2-draco-en")
+        ),
+    )
+
+
 class PlayerWorker(PipelineWorker):
     """Talks to the player, and owns the world their game renders."""
 
     def __init__(self, transport: BaseTransport):
         stt = DeepgramSTTService(api_key=os.environ["DEEPGRAM_API_KEY"])
 
-        llm = OpenAILLMService(
-            api_key=os.environ["OPENAI_API_KEY"],
-            settings=OpenAILLMService.Settings(system_instruction=SYSTEM_INSTRUCTION),
-        )
+        llm = create_llm()
         llm.register_function("set_environment", self._set_environment)
+        llm.register_function("spawn_object", self._spawn_object)
+        llm.register_function("clear_objects", self._clear_objects)
 
-        tts = CartesiaTTSService(
-            api_key=os.environ["CARTESIA_API_KEY"],
-            settings=CartesiaTTSService.Settings(voice=os.environ["CARTESIA_VOICE_ID"]),
-        )
+        tts = create_tts()
 
-        context = LLMContext(tools=ToolsSchema([SET_ENVIRONMENT]))
+        context = LLMContext(tools=ToolsSchema([SET_ENVIRONMENT, SPAWN_OBJECT, CLEAR_OBJECTS]))
         user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
             context,
             user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
@@ -174,6 +259,20 @@ class PlayerWorker(PipelineWorker):
         await self._send_environment()
         # Tell the LLM what the world looks like now.
         await params.result_callback(self._environment)
+
+    async def _spawn_object(self, params: FunctionCallParams):
+        name = params.arguments.get("object")
+        if name not in OBJECTS:
+            await params.result_callback({"error": f"There's no {name}."})
+            return
+        logger.info(f"Spawning a {name}")
+        await self.rtvi.send_server_message({"type": "spawn", "object": name})
+        await params.result_callback({"spawned": name})
+
+    async def _clear_objects(self, params: FunctionCallParams):
+        logger.info("Clearing the objects")
+        await self.rtvi.send_server_message({"type": "clear"})
+        await params.result_callback({"cleared": True})
 
     async def _send_environment(self):
         await self.rtvi.send_server_message(

@@ -11,6 +11,7 @@
 
 #include "PipecatDemoSubsystem.generated.h"
 
+class APipecatObjects;
 class APipecatWorld;
 
 // Builds the world, and adds the Pipecat companion to it, when play begins.
@@ -33,4 +34,5 @@ private:
 	void HandleServerMessage(const FString& DataJson);
 
 	TWeakObjectPtr<APipecatWorld> Environment;
+	TWeakObjectPtr<APipecatObjects> Objects;
 };

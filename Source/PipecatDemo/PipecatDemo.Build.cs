@@ -16,6 +16,7 @@ public class PipecatDemo : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
+			"InputCore",
 			"Json",
 			"Pipecat",
 			"ProceduralMeshComponent",
