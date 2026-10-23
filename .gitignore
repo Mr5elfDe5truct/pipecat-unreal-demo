@@ -9,6 +9,8 @@ Plugins/*/Intermediate/
 # Copied from the engine by setup.sh or setup.ps1, except the splash screens.
 /Content/*
 !/Content/Splash/
+# The demo's level.
+!/Content/Maps/
 
 # Built by Plugins/Pipecat/ThirdParty/build-linux.sh, build-mac.sh or
 # build-windows.ps1.

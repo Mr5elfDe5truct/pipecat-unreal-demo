@@ -47,10 +47,28 @@ FAutoConsoleCommandWithWorldAndArgs SpawnCommand(
 	}));
 } // namespace
 
+const FName APipecatObjects::GroundTag(TEXT("OnGround"));
+
 APipecatObjects::APipecatObjects()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+}
+
+void APipecatObjects::BeginPlay()
+{
+	Super::BeginPlay();
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(GroundTag))
+		{
+			Placed.Add(*It);
+		}
+	}
+	if (!Placed.IsEmpty())
+	{
+		UE_LOG(LogPipecatObjects, Log, TEXT("Keeping %d actors of the level on the ground"), Placed.Num());
+	}
 }
 
 void APipecatObjects::Tick(float DeltaSeconds)
@@ -68,6 +86,13 @@ void APipecatObjects::Tick(float DeltaSeconds)
 	for (AActor* Object : Spawned)
 	{
 		PutOnGround(Object);
+	}
+	for (const TWeakObjectPtr<AActor>& Object : Placed)
+	{
+		if (Object.IsValid())
+		{
+			PutOnGround(Object.Get());
+		}
 	}
 }
 
@@ -88,6 +113,11 @@ void APipecatObjects::PutOnGround(AActor* Object)
 
 	FCollisionQueryParams Params(TEXT("PipecatObjectGround"), true);
 	Params.AddIgnoredActors(ToRawPtrTArrayUnsafe(Spawned));
+	Params.AddIgnoredActor(Object);
+	for (const TWeakObjectPtr<AActor>& Other : Placed)
+	{
+		Params.AddIgnoredActor(Other.Get());
+	}
 	if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
 	{
 		Params.AddIgnoredActor(Player);

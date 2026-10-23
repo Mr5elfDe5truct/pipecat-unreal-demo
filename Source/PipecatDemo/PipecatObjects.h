@@ -57,6 +57,12 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 
+	/** Actors in the level with this tag stay on the ground too, as it changes. */
+	static const FName GroundTag;
+
+protected:
+	virtual void BeginPlay() override;
+
 private:
 	// Gives the player the interaction manager, and the keys that use it, once
 	// there's a player.
@@ -73,4 +79,7 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<AActor>> Spawned;
+
+	// Actors placed in the level, with GroundTag, which Clear() leaves.
+	TArray<TWeakObjectPtr<AActor>> Placed;
 };
