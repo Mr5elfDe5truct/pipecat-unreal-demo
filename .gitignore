@@ -29,3 +29,8 @@ pipecat/.venv/
 pipecat/.env
 pipecat/.envrc
 pipecat/__pycache__/
+
+# Fab packs' preview images, which they put next to the project.
+/*.png
+!/pipecat-unreal-demo.png
+!/pipecat.png

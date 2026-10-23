@@ -10,7 +10,15 @@
 #include "Components/MeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Animation/AnimationAsset.h"
+#include "Animation/SkeletalMeshActor.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/CollisionProfile.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMeshActor.h"
+#include "NiagaraActor.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
@@ -108,7 +116,8 @@ void APipecatObjects::PutOnGround(AActor* Object)
 	});
 	if (!Bounds.IsValid)
 	{
-		Bounds = Object->GetComponentsBoundingBox(false, true);
+		// E.g. fire, which starts where the actor is.
+		Bounds = FBox(Object->GetActorLocation(), Object->GetActorLocation());
 	}
 
 	FCollisionQueryParams Params(TEXT("PipecatObjectGround"), true);
@@ -225,8 +234,10 @@ void APipecatObjects::Spawn(const FString& Name)
 			break;
 		}
 	}
-	// Facing the player. Tick puts it on the ground.
+	// Facing the player, turned by the kind's Yaw for meshes that face
+	// another way. Tick puts it on the ground.
 	FRotator Rotation((Center - Location).GetSafeNormal2D().Rotation());
+	Rotation.Yaw += Kind->Yaw;
 	FTransform Transform(Rotation, Location, FVector(Kind->Scale));
 
 	FActorSpawnParameters Params;
@@ -247,10 +258,54 @@ void APipecatObjects::Spawn(const FString& Name)
 		}
 		Object = MeshActor;
 	}
+	else if (USkeletalMesh* Skeletal = Cast<USkeletalMesh>(Asset))
+	{
+		// E.g. an animal or a person, which plays its idle animation over and
+		// over, instead of standing in its bind pose.
+		ASkeletalMeshActor* MeshActor = GetWorld()->SpawnActor<ASkeletalMeshActor>(Transform.GetLocation(), Rotation, Params);
+		if (MeshActor)
+		{
+			USkeletalMeshComponent* Component = MeshActor->GetSkeletalMeshComponent();
+			Component->SetSkeletalMesh(Skeletal);
+			Component->SetCollisionProfileName(UCollisionProfile::BlockAllDynamic_ProfileName);
+			if (UAnimationAsset* Animation = Cast<UAnimationAsset>(Kind->Animation.TryLoad()))
+			{
+				Component->PlayAnimation(Animation, true);
+			}
+			MeshActor->SetActorScale3D(FVector(Kind->Scale));
+		}
+		Object = MeshActor;
+	}
+	else if (UNiagaraSystem* Effect = Cast<UNiagaraSystem>(Asset))
+	{
+		// E.g. fire or smoke, which goes on until it's cleared.
+		ANiagaraActor* EffectActor = GetWorld()->SpawnActor<ANiagaraActor>(Transform.GetLocation(), Rotation, Params);
+		if (EffectActor)
+		{
+			EffectActor->GetNiagaraComponent()->SetAsset(Effect);
+			EffectActor->GetNiagaraComponent()->Activate(true);
+			EffectActor->SetActorScale3D(FVector(Kind->Scale));
+		}
+		Object = EffectActor;
+	}
 	if (!Object)
 	{
 		UE_LOG(LogPipecatObjects, Warning, TEXT("Unable to add a %s from %s"), *Name, *Kind->Asset.ToString());
 		return;
+	}
+
+	// Big things, like dragons, go further out, so the player isn't inside them.
+	FBox Bounds = Object->GetComponentsBoundingBox(false, true);
+	if (Bounds.IsValid)
+	{
+		float Radius = FMath::Max(Bounds.GetExtent().X, Bounds.GetExtent().Y);
+		float Push = Radius - Spacing * 0.5f;
+		if (Push > 0.0f)
+		{
+			FVector Out = (Location - Center).GetSafeNormal2D() * Push;
+			Object->AddActorWorldOffset(Out);
+			Location += Out;
+		}
 	}
 	Spawned.Add(Object);
 	UE_LOG(LogPipecatObjects, Log, TEXT("Added a %s at %s"), *Name, *Location.ToCompactString());

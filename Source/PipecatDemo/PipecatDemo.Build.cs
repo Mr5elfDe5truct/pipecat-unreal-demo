@@ -18,6 +18,7 @@ public class PipecatDemo : ModuleRules
 			"Engine",
 			"InputCore",
 			"Json",
+			"Niagara",
 			"Pipecat",
 			"ProceduralMeshComponent",
 			"Slate",

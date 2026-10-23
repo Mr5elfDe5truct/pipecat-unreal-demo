@@ -21,13 +21,21 @@ struct FPipecatObjectKind
 	UPROPERTY(Config)
 	FString Name;
 
-	// An actor's class, e.g. a Blueprint's "/Game/Path/BP_Door.BP_Door_C", or
-	// a static mesh.
+	// An actor's class, e.g. a Blueprint's "/Game/Path/BP_Door.BP_Door_C", a
+	// static or skeletal mesh, or a Niagara effect.
 	UPROPERTY(Config)
 	FSoftObjectPath Asset;
 
+	// For a skeletal mesh, the animation it plays over and over, e.g. idling.
+	UPROPERTY(Config)
+	FSoftObjectPath Animation;
+
 	UPROPERTY(Config)
 	float Scale = 1.0f;
+
+	// Degrees it's turned by, for meshes that don't face along X.
+	UPROPERTY(Config)
+	float Yaw = 0.0f;
 };
 
 // The objects the bot puts in the world, in front of the player, and the

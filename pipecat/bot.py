@@ -58,7 +58,8 @@ you can't do yet, say so, and suggest something you can.
 
 You can also put objects in front of the player with the spawn_object function,
 and take them all away with clear_objects. Pick the closest object you have for
-what they ask for, and say what you made. The player uses doors, levers, boxes
+what they ask for, and say what you made. You can make animals, dragons,
+people, fires, weapons, rocks and trees, among other things. The player uses doors, levers, boxes
 and people by walking up to them and pressing F, and the mouse wheel chooses
 what to do.
 
@@ -104,6 +105,36 @@ OBJECTS = {
     "crate": "A plain crate, to climb on or build with.",
     "ramp": "A ramp, to walk up.",
     "pillar": "A tall round pillar.",
+    "deer": "A stag with antlers, grazing.",
+    "doe": "A female deer, grazing.",
+    "fox": "A fox.",
+    "pig": "A pig.",
+    "wolf": "A wolf.",
+    "crow": "A crow, a black bird.",
+    "dragon": "A dragon, the size of a house.",
+    "nightmare_dragon": "A dark, nightmarish dragon.",
+    "terror_dragon": "A huge, terrifying dragon.",
+    "giant_dragon": "The biggest dragon, as big as a castle.",
+    "man": "A man in a jacket.",
+    "man_2": "Another man, dressed differently.",
+    "villager": "A person in casual clothes.",
+    "villager_2": "Another person in casual clothes.",
+    "villager_3": "Another person in casual clothes.",
+    "villager_4": "Another person in casual clothes.",
+    "campfire": "A campfire that lights up the area around it.",
+    "bonfire": "A big bonfire.",
+    "big_fire": "A large blaze of fire.",
+    "torch_fire": "A small flame, like a torch's.",
+    "smoke": "A column of smoke.",
+    "rifle": "An assault rifle, lying on the ground.",
+    "shotgun": "A shotgun, lying on the ground.",
+    "pistol": "A pistol, lying on the ground.",
+    "sniper_rifle": "A sniper rifle, lying on the ground.",
+    "rocket_launcher": "A rocket launcher, lying on the ground.",
+    "grenade_launcher": "A grenade launcher, lying on the ground.",
+    "boulder": "A big boulder.",
+    "rocks": "A group of small rocks.",
+    "big_tree": "A huge old tree with big roots.",
 }
 
 SPAWN_OBJECT = FunctionSchema(
